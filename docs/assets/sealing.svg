@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 474" width="820" height="474" role="img" aria-label="Private state sealed across protocols">
+<title>Private state sealed across protocols</title>
+<style>
+  svg { font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Noto Sans CJK SC&quot;, &quot;Noto Sans SC&quot;, Helvetica, Arial, sans-serif; }
+  .bg { fill: #ffffff; }
+  .frame { fill: #f2f8f8; stroke: #0d7b84; stroke-width: 1.5; }
+  .box { fill: #ffffff; stroke: #c9d3d8; stroke-width: 1; }
+  .key { fill: #ffffff; stroke: #0d7b84; stroke-width: 1.5; }
+  .pill { fill: #f5f7f8; stroke: #c9d3d8; stroke-width: 1; }
+  .warn { fill: #fff7ec; stroke: #e0b26a; stroke-width: 1; }
+  .t { fill: #14212b; font-size: 14px; font-weight: 600; }
+  .s { fill: #56656f; font-size: 12px; }
+  .p { fill: #14212b; font-size: 13px; }
+  .lbl { fill: #56656f; font-size: 12px; }
+  .sec { fill: #56656f; font-size: 12px; font-weight: 600; letter-spacing: .04em; }
+  .brand { fill: #0d7b84; font-size: 15px; font-weight: 700; }
+  .num { fill: #ffffff; font-size: 12px; font-weight: 700; }
+  .dot { fill: #0d7b84; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.5px; fill: #0d7b84; }
+  .a { stroke: #0d7b84; stroke-width: 1.6; fill: none; }
+  .r { stroke: #7a8a94; stroke-width: 1.4; fill: none; stroke-dasharray: 4 3; }
+  .g { stroke: #9aa8b0; stroke-width: 1.2; fill: none; }
+  .life { stroke: #c9d3d8; stroke-width: 1; stroke-dasharray: 3 4; }
+  .ha { fill: #0d7b84; } .hr { fill: #7a8a94; } .hg { fill: #9aa8b0; }
+  @media (prefers-color-scheme: dark) {
+    .bg { fill: #0d1117; }
+    .frame { fill: #0f2226; stroke: #3fb8b0; }
+    .box, .key { fill: #161b22; }
+    .box, .pill { stroke: #30404a; }
+    .key { stroke: #3fb8b0; }
+    .pill { fill: #161b22; }
+    .warn { fill: #2a2112; stroke: #8a6a35; }
+    .t, .p { fill: #e6edf3; }
+    .s, .lbl, .sec { fill: #9aa7b2; }
+    .brand, .mono { fill: #5fd6cc; }
+    .dot, .ha { fill: #3fb8b0; }
+    .num { fill: #0d1117; }
+    .a { stroke: #3fb8b0; }
+    .r { stroke: #8b98a2; } .hr { fill: #8b98a2; }
+    .g { stroke: #5c6a74; } .hg { fill: #5c6a74; }
+    .life { stroke: #30404a; }
+  }
+</style>
+<defs>
+  <marker id="ma" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ha"/></marker>
+  <marker id="mr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="hr"/></marker>
+  <marker id="mg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="hg"/></marker>
+</defs>
+<rect width="820" height="474" rx="12" class="bg"/>
+<line x1="130" y1="54" x2="130" y2="460" class="life"/>
+<line x1="410" y1="54" x2="410" y2="460" class="life"/>
+<line x1="690" y1="54" x2="690" y2="460" class="life"/>
+<rect x="25.0" y="18.0" width="210.0" height="34.0" rx="17" class="pill"/>
+<text x="130.0" y="40.0" class="p" text-anchor="middle">Codex (responses)</text>
+<rect x="305.0" y="18.0" width="210.0" height="34.0" rx="17" class="key"/>
+<text x="410.0" y="40.0" class="p" text-anchor="middle">plugrelay</text>
+<rect x="585.0" y="18.0" width="210.0" height="34.0" rx="17" class="pill"/>
+<text x="690.0" y="40.0" class="p" text-anchor="middle">Upstream A (Anthropic)</text>
+<path d="M134.0,92.0 L406.0,92.0" class="a" marker-end="url(#ma)"/>
+<text x="270.0" y="85.0" class="lbl" text-anchor="middle">request</text>
+<path d="M414.0,130.0 L686.0,130.0" class="a" marker-end="url(#ma)"/>
+<text x="550.0" y="123.0" class="lbl" text-anchor="middle">converted to messages</text>
+<path d="M686.0,168.0 L414.0,168.0" class="r" marker-end="url(#mr)"/>
+<text x="550.0" y="161.0" class="lbl" text-anchor="middle">thinking block + signature</text>
+<rect x="260.0" y="190.0" width="300.0" height="26.0" rx="6" class="box"/>
+<text x="410.0" y="208.0" class="s" text-anchor="middle">seal {issuer A, data} with AES-256-GCM</text>
+<path d="M406.0,246.0 L134.0,246.0" class="r" marker-end="url(#mr)"/>
+<text x="270.0" y="239.0" class="lbl" text-anchor="middle">reasoning item, encrypted_content = prs1.…</text>
+<path d="M134.0,318.0 L406.0,318.0" class="a" marker-end="url(#ma)"/>
+<text x="270.0" y="311.0" class="lbl" text-anchor="middle">echoes encrypted_content</text>
+<rect x="260.0" y="340.0" width="300.0" height="26.0" rx="6" class="box"/>
+<text x="410.0" y="358.0" class="s" text-anchor="middle">open, check issuer</text>
+<path d="M414.0,396.0 L686.0,396.0" class="a" marker-end="url(#ma)"/>
+<text x="550.0" y="389.0" class="lbl" text-anchor="middle">routed to A again: original block + signature</text>
+<rect x="340.0" y="418.0" width="420.0" height="26.0" rx="6" class="warn"/>
+<text x="352.0" y="436.0" class="s" text-anchor="start">otherwise (other issuer, tampered, wrong key): dropped, no error</text>
+<line x1="20" y1="288" x2="800" y2="288" class="g" stroke-dasharray="2 4"/>
+<text x="20.0" y="76.0" class="sec" text-anchor="start">turn 1</text>
+<text x="20.0" y="310.0" class="sec" text-anchor="start">turn 2</text>
+</svg>

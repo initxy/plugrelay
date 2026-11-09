@@ -2,23 +2,21 @@
 
 English | [简体中文](README.zh-CN.md)
 
-Results of real coding clients driven through a relay against a live
-upstream. Each row is one client on one route in one run of
-`scripts/compat.sh`; the linked report has every case of that run, the
-protocol suite included.
+Real coding clients driven through the relay against a live upstream. Each
+row below is one client on one route in one run of `scripts/compat.sh`; the
+linked report has every case of that run, protocol tests included.
 
 - **What a run does.** [`TestClients`](../../test/e2e/clients_test.go) builds
-  the relay, configures each client with `plugrelay setup` in a throwaway
-  home (the user's own `~/.claude` and `~/.codex` are never touched) and asks
-  it to write `answer.py`, run it and report the output; the test checks the
-  file, its output and the request log. [`TestRelay`](../../test/e2e/e2e_test.go)
+  the relay, sets up each client with `plugrelay setup` in a throwaway home
+  (your own `~/.claude` and `~/.codex` are not touched), and asks it to write
+  `answer.py`, run it and report the output. [`TestRelay`](../../test/e2e/e2e_test.go)
   calls every client protocol directly.
-- **Routes.** *responses upstream*: the generic OpenAI-compatible manifest,
-  so Codex's Responses requests pass through and Claude Code's Anthropic
-  requests are converted. *chat-only upstream*: a manifest with only Chat
-  Completions, so every request from either client is converted.
-- **Pass** means the program ran, printed 42, the client reported it, and
-  every request in the log succeeded through the expected upstream.
+- **Routes.** *responses upstream* uses the generic OpenAI-compatible
+  manifest: Codex's requests pass through, Claude Code's are converted.
+  *chat-only upstream* offers only Chat Completions, so every request is
+  converted.
+- **Pass** means the program printed 42, the client reported it, and every
+  request in the log succeeded through the expected upstream.
 
 ## Running it
 
@@ -30,18 +28,16 @@ export PLUGRELAY_COMPAT_UPSTREAM="name for the report" # the URL is never writte
 scripts/compat.sh                    # writes docs/compat/<date>.md, updates this table
 ```
 
-`claude` and `codex` must be on `PATH` (a missing one is recorded as
-skipped), plus `go`, `jq` and `python3`. A scheduled workflow,
-[`compat.yml`](../../.github/workflows/compat.yml), runs the same script
-weekly or on demand when the repository has the `PLUGRELAY_E2E_BASE` and
-`PLUGRELAY_E2E_KEY` secrets (optional variables `PLUGRELAY_E2E_MODEL`,
-`PLUGRELAY_E2E_CHAT_MODEL`, `PLUGRELAY_COMPAT_UPSTREAM`), and uploads the
+Needs `go`, `jq`, `python3`, and `claude` and `codex` on `PATH` (a missing
+client is recorded as skipped). The [`compat.yml`](../../.github/workflows/compat.yml)
+workflow runs the same script weekly or on demand when the repository has
+the `PLUGRELAY_E2E_BASE` and `PLUGRELAY_E2E_KEY` secrets, and uploads the
 report as an artifact for a maintainer to commit.
 
 ## Other live checks
 
-Opt-in e2e tests against real services, each skipping with its reason when
-not set up; outputs of the last run are in the dated report.
+Opt-in e2e tests against real services; each skips with a reason when not
+set up. The last run's output is in [2026-11-06-live](2026-11-06-live.md).
 
 | test | service | turn on |
 |-|-|-|

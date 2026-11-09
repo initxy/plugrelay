@@ -2,15 +2,15 @@
 
 English | [简体中文](deployment.zh-CN.md)
 
-One binary serves every shape. Pick the smallest that fits:
+One binary for every setup. Pick the smallest that fits:
 
-| shape | listen | store / state | console | typical |
-|-|-|-|-|-|
-| local, one person | `127.0.0.1:8787` | SQLite / memory or sql | on; on loopback it needs no login | a laptop |
-| team, one node | loopback behind a TLS proxy | SQLite, PostgreSQL or MySQL / sql or Redis | on, login required | a small VM |
-| team or sell, several nodes | behind a load balancer | PostgreSQL or MySQL / Redis (required) | on | containers |
+| setup | listen | store / state | console |
+|-|-|-|-|
+| one person, a laptop | `127.0.0.1:8787` | SQLite / memory or sql | no login on loopback |
+| a team, one VM | loopback behind a TLS proxy | SQLite, PostgreSQL or MySQL / sql or Redis | login required |
+| several nodes | behind a load balancer | PostgreSQL or MySQL / Redis (required) | login required |
 
-Every setting below is documented in [configuration.md](configuration.md).
+Settings are explained in [configuration.md](configuration.md).
 
 - [Local single-user](#local-single-user)
 - [Team behind a TLS reverse proxy](#team-behind-a-tls-reverse-proxy)
@@ -35,30 +35,24 @@ plugrelay serve
 plugrelay setup claude-code --key pr_...
 ```
 
-A local server that takes no key (Ollama, vLLM, …) is added without
-`--credential-env`; it is then keyless ([plugins](plugins.md#declarative-upstream-manifests)).
-Any other upstream needs a credential before it is routed.
+A local server that needs no key (Ollama, vLLM, …) is added without
+`--credential-env` ([plugins](plugins.md#declarative-upstream-manifests)).
+Other upstreams are not routed until they have a credential.
 
-`init` without `--admin-email` creates an owner account with a random
-password; while the relay listens on loopback only, the console and admin
-API accept loopback requests without a login (the local-owner rule,
-[API auth](api.md)) — unless the request carries `X-Forwarded-For`,
-`Forwarded` or `X-Real-IP`, which mark it as relayed by a proxy. On a
-loopback listener, first-run setup in the console also only answers
-`localhost` or loopback-IP `Host` names. Clients: [clients.md](clients.md).
+Without `--admin-email`, `init` creates a local owner account. While the
+relay listens on loopback only, the console and admin API let loopback
+requests in without a login ([API auth](api.md)), unless the request carries
+`X-Forwarded-For`, `Forwarded` or `X-Real-IP`. First-run setup on a loopback
+listener only answers a `localhost` or loopback-IP `Host`.
 
 `init` flags for the console account:
 
-- `--admin-email E` creates an admin instead of the owner account and turns
-  the local-owner rule off. Required when `--listen` is not loopback (or
-  pass `--no-admin`).
-- `--admin-password P` is that admin's password. It ends up in shell
-  history: prefer `PLUGRELAY_ADMIN_PASSWORD`, or leave both unset and type
-  it on stdin. There is no default password.
-- `--admin-name N` is the admin's display name (default `admin`).
-- `--no-admin` creates neither an admin nor the owner account; the
-  console's first-run setup then creates the admin, open to whoever reaches
-  it first.
+| flag | effect |
+|-|-|
+| `--admin-email E` | create an admin instead of the local owner, and turn the local-owner rule off. Required when `--listen` is not loopback (or pass `--no-admin`). |
+| `--admin-password P` | the admin's password. It lands in shell history: prefer `PLUGRELAY_ADMIN_PASSWORD`, or type it on stdin. No default. |
+| `--admin-name N` | display name (default `admin`) |
+| `--no-admin` | create no account; the console's first-run setup creates the admin, open to whoever gets there first |
 
 ## Team behind a TLS reverse proxy
 
@@ -69,18 +63,18 @@ PLUGRELAY_ADMIN_PASSWORD=... plugrelay init \
 plugrelay serve --config /etc/plugrelay/relay.yaml
 ```
 
-Keep `listen` on `127.0.0.1:8787` and terminate TLS in a proxy. The proxy
-must not buffer: streams are forwarded event by event, keepalives arrive
-every 15 s while an upstream is busy, and a single response can run for many
-minutes (attempt total timeout 30 min). Forward the original `Host` header
-and set `X-Forwarded-For` — the local-owner rule only applies to loopback
-`Host` names without forwarding headers, and a proxy that rewrites `Host` to
-`127.0.0.1` and sends neither would, with the local-owner rule on, let every
-visitor act as the owner. Create the admin with `init` as above (which also
-turns that rule off): behind the proxy the console's first-run setup refuses
-the public `Host`.
+Keep `listen` on `127.0.0.1:8787` and terminate TLS in the proxy. The proxy
+must:
 
-Caddy (buffering is already off for streamed responses; `flush_interval -1`
+- not buffer: streams go out event by event, keepalives every 15 s, and one
+  response can run up to the 30-minute attempt timeout;
+- forward the original `Host` and set `X-Forwarded-For`. A proxy that
+  rewrites `Host` to `127.0.0.1` without forwarding headers would let every
+  visitor in as the local owner if that rule were on. Creating the admin
+  with `init --admin-email` turns it off; behind the proxy, first-run setup
+  refuses the public `Host` anyway.
+
+Caddy (streamed responses are not buffered by default; `flush_interval -1`
 makes it explicit):
 
 ```caddyfile
@@ -128,73 +122,64 @@ server {
 }
 ```
 
-Cursor calls from its own servers, so a team that uses Cursor needs this
-public HTTPS entry and the public URL (site setting `site.public_base_url`)
-set.
+Cursor calls from its own servers, so Cursor users need this public HTTPS
+entry and the public URL (`site.public_base_url`) set.
 
-By default the client address is the TCP peer, so behind a proxy every
-request appears to come from the proxy. List the proxy in `trusted_proxies`
-([configuration](configuration.md#top-level)) so IP allowlists, per-IP
-limits, logs and login throttling see the real client:
+Behind a proxy every request seems to come from the proxy. List it in
+[`trusted_proxies`](configuration.md#top-level) so allowlists, per-IP limits,
+logs and login throttling see the real client:
 
 ```yaml
 trusted_proxies: [127.0.0.1, "::1"]   # the proxy above, on the same host
 ```
 
-The proxy must overwrite or append to `X-Forwarded-For` as the nginx example
-does (`$proxy_add_x_forwarded_for`; Caddy does by default). Never list
-addresses that untrusted clients can connect from: a trusted peer can claim
-any client address. In Docker, list the proxy container's address or
-network, not the whole host.
+The proxy must overwrite or append `X-Forwarded-For` (nginx above does;
+Caddy does by default). Never list addresses untrusted clients can connect
+from: a trusted peer can claim any client address. In Docker, list the
+proxy container's address or network, not the whole host.
 
-Probes: `GET /healthz` (process up) and `GET /readyz` (snapshot loaded, store
-reachable). Prometheus: `GET /metrics`, protected by
-`PLUGRELAY_ADMIN_TOKEN` when that is set.
+Probes: `GET /healthz` (process up), `GET /readyz` (config loaded, store
+reachable). Prometheus: `GET /metrics`, protected by `PLUGRELAY_ADMIN_TOKEN`
+when set.
 
 ## Docker and Compose with PostgreSQL and Redis
 
 The image (`Dockerfile`, distroless, non-root) runs
-`plugrelay serve --config /data/relay.yaml`. A missing relay.yaml means
-defaults, so the container can be configured with `PLUGRELAY_*` variables
-alone.
+`plugrelay serve --config /data/relay.yaml`. Without a relay.yaml it uses
+defaults, so `PLUGRELAY_*` variables alone can configure it.
 
 [`deploy/docker-compose.yml`](../deploy/docker-compose.yml) runs plugrelay with
-PostgreSQL and Redis, configured entirely by environment:
+PostgreSQL and Redis, all from environment:
 
 ```bash
 cp deploy/.env.example deploy/.env      # set PLUGRELAY_MASTER_KEY, POSTGRES_PASSWORD
 docker compose -f deploy/docker-compose.yml up -d
 ```
 
-- The relay port is published on `127.0.0.1:8787`; put the proxy above in
-  front of it.
-- On first start the log says `first run: open the setup wizard`; open
-  `/setup` (through the proxy or an SSH tunnel) to create the admin. Do it
-  right away — until an admin exists, the wizard is open to whoever reaches
-  it first.
-  Then set the public URL under Settings.
-- CLI commands run inside the container with the same environment:
+- The port is published on `127.0.0.1:8787`; put the proxy above in front.
+- First start logs `first run: open the setup wizard`. Open `/setup`
+  (through the proxy or an SSH tunnel) right away and create the admin:
+  until then anyone who reaches it can. Then set the public URL in Settings.
+- CLI commands run in the container with the same environment:
 
   ```bash
   docker compose -f deploy/docker-compose.yml exec plugrelay plugrelay upstream list
   docker compose -f deploy/docker-compose.yml exec plugrelay plugrelay key create --name ci
   ```
 
-- Upstream API keys for `upstream add --credential-env` must be in the
-  container's environment; adding credentials in the console avoids that.
-- More than one relay node: run several `plugrelay` replicas against the same
-  PostgreSQL and Redis. State must be Redis — memory and sql state are
-  per-node.
-- MySQL instead of PostgreSQL: the comment at the top of the compose file
-  shows the service and the two store variables to swap.
-- `deploy/.env` holds the master key; keep it out of version control and
+- `upstream add --credential-env` needs the key in the container's
+  environment; adding credentials in the console avoids that.
+- Several nodes: run more `plugrelay` replicas on the same PostgreSQL and
+  Redis. State must be Redis.
+- MySQL: the comment at the top of the compose file shows the service and
+  the two store variables to change.
+- `deploy/.env` holds the master key: keep it out of version control and
   back it up.
 
 ### Single container with SQLite
 
-Mount a host directory owned by the container user and point the store at
-it. Generate the master key into a file first and keep that file: it is the
-only way to read stored credentials later.
+Generate the master key into a file and keep it; it is the only way to read
+stored credentials later. Mount a host directory the container user owns.
 
 ```bash
 openssl rand -base64 32 > master.key && chmod 600 master.key
@@ -206,82 +191,68 @@ docker run -d --name plugrelay -p 127.0.0.1:8787:8787 --stop-timeout 120 \
   ghcr.io/initxy/plugrelay:latest
 ```
 
-Before the first tagged release there is no published image: build one with
-`docker build -t plugrelay .` in a checkout and run `plugrelay` instead of
-`ghcr.io/initxy/plugrelay:latest`.
+Until the first tagged release no image is published: run
+`docker build -t plugrelay .` in a checkout and use `plugrelay` as the image.
 
 ## Single sign-on
 
-The console can sign people in through an OpenID Connect provider or an
-OAuth provider. Turn the `sso` feature on first: while it is off no provider
-is offered and password sign-in always works. Providers are configured in
-the console under **System → Sign-in providers** (or
-`POST /api/v1/sso/providers`) and stored in the database; the client secret is sealed with the master key. Calls to the provider (discovery, keys, token, user info) go through the core egress and its SSRF guard. Code:
-`internal/admin/sso_*.go`.
+The console can sign people in through OpenID Connect or OAuth providers.
+Turn the `sso` feature on, then add providers under **System → Sign-in
+providers** (or `POST /api/v1/sso/providers`). The client secret is sealed
+with the master key; calls to the provider go through the core egress and its
+SSRF guard. Code: `internal/admin/sso_*.go`.
 
-Prerequisites: the *Public base URL* site setting (`site.public_base_url`)
-must be set unless the relay listens on loopback only and is opened at a
-loopback name — the redirect URI is built from it, never from the request's
-`Host`. Each provider's redirect URI is shown in the console:
+The redirect URI is built from the public URL (`site.public_base_url`),
+never from the request's `Host`, so set it unless the relay is loopback-only
+and opened at a loopback name. The console shows each provider's URI:
 
 ```text
 https://relay.example.com/api/v1/auth/sso/<provider id>/callback
 ```
 
-How a sign-in works: the login page links to `/api/v1/auth/sso/<id>/start`,
-which redirects to the provider with PKCE (S256), a one-time `state` bound to
-the browser by the `pr_sso` cookie, and (OIDC) a `nonce`. The callback redeems
-the code; for OIDC it verifies the ID token signature against the provider's
-JWKS (RS/PS/ES 256–512, keys cached for an hour and refetched when an unknown
-`kid` appears) and checks `iss`, `aud`, `azp`, `exp`, `nbf`, `iat` and
-`nonce`. Then the identity maps to a user, in this order:
+Sign-in uses PKCE (S256), a one-time `state` bound to the browser by the
+`pr_sso` cookie and, for OIDC, a `nonce`; ID tokens are checked against the
+provider's JWKS (RS/PS/ES 256–512, cached an hour). The identity maps to a
+user, first match wins:
 
-1. an identity already linked to a user (`provider`, `subject`);
-2. with **Link existing users by email**, a user whose email equals the
-   provider's *verified* email (case-insensitive). Admin accounts are skipped
-   unless **Also link admin accounts** (`link_admins`) is on too;
+1. an identity already linked (`provider`, `subject`);
+2. with **Link existing users by email**, a user with the same *verified*
+   email. Admins only with **Also link admin accounts** (`link_admins`);
 3. with **Create users on first sign-in**, a new user with the default role
-   (`user` or `member`, never `admin`) and the group from the first matching
-   group rule (`@domain` of the verified email, or a claim such as `groups`
-   with a value), else the default group. GitHub providers take domain rules
-   only and Feishu/Lark domain or `tenant_key` rules: their other profile
-   fields are typed in by the user.
+   (never `admin`), in the group of the first matching rule (`@domain` of
+   the verified email, or a claim such as `groups`), else the default
+   group. GitHub takes domain rules only; Feishu/Lark domain or `tenant_key`.
 
 An email counts as verified when the provider says so. *Trust email*
-(`trust_email`) only fills in for a provider that says nothing; an explicit
-`email_verified: false` stays unverified. Feishu/Lark providers need allowed
-tenants before *trust email* can be on. Links are scoped to the provider's
-issuer, tenant and client ID: changing any of them unlinks everyone who
-signed in with it, and they are matched afresh on their next sign-in.
+(`trust_email`) fills in only when the provider says nothing; Feishu/Lark
+needs allowed tenants first. Allowed tenants match the Entra `tid` or the
+Feishu/Lark `tenant_key`. Links are tied to the provider's issuer, tenant and
+client ID; changing one unlinks its users until they sign in again.
 
-Otherwise the login page shows why (`/login?sso_error=<code>`). Allowed email
-domains need a verified email; allowed tenants match the Entra `tid` or the
-Feishu/Lark `tenant_key`. A successful sign-in sets the same session and CSRF
-cookies as a password login and writes `auth.login` (plus `user.create` and
-`user.identity.link` when those happen) to the audit log. Failures count
-against the same per-address limit as wrong passwords; starting more than 60
-sign-ins in five minutes from one address is refused too.
+Errors show on the login page (`/login?sso_error=<code>`). Sign-ins are
+audited (`auth.login`, `user.create`, `user.identity.link`). Failures count
+toward the wrong-password limit per address, and more than 60 sign-in starts
+in five minutes from one address are refused.
 
 ### Provider setup
 
 | preset | at the provider | in plugrelay |
 |-|-|-|
 | `google` | Google Cloud console → APIs & Services → Credentials → OAuth client ID, type *Web application*; add the redirect URI. | client ID and secret. Allowed domains such as `example.com` keep personal Gmail accounts out. |
-| `microsoft` | Entra admin center → App registrations → New registration, platform *Web*, redirect URI; Certificates & secrets → new client secret. Optional claims: add `email` to the ID token. | tenant = directory (tenant) ID or a verified domain for one organization; `organizations` admits any work account (then list tenant IDs under allowed tenants). In a single-tenant app the email is trusted; multi-tenant needs `xms_edov` or *trust email*. |
-| `keycloak` | Realm → Clients → Create, OpenID Connect, *Client authentication* on, *Standard flow* on; valid redirect URI = the URI above. | issuer `https://<host>/realms/<realm>`. Map groups with a *Group Membership* mapper (claim `groups`, full path off) to use group rules. |
+| `microsoft` | Entra admin center → App registrations → New registration, platform *Web*, redirect URI; Certificates & secrets → new client secret. Optional claims: add `email` to the ID token. | tenant = directory (tenant) ID or a verified domain for one organization; `organizations` admits any work account (then list tenant IDs under allowed tenants). Single-tenant apps trust the email; multi-tenant needs `xms_edov` or *trust email*. |
+| `keycloak` | Realm → Clients → Create, OpenID Connect, *Client authentication* on, *Standard flow* on; valid redirect URI = the URI above. | issuer `https://<host>/realms/<realm>`. For group rules add a *Group Membership* mapper (claim `groups`, full path off). |
 | `authentik` | Applications → Providers → OAuth2/OpenID Provider, client type *Confidential*, redirect URI; create an application for it. | issuer `https://<host>/application/o/<application slug>/`. |
-| `oidc` | any provider with `/.well-known/openid-configuration` under its issuer. | issuer URL exactly as the provider publishes it. |
-| `github` | Settings → Developer settings → OAuth Apps → New OAuth App; callback URL = the URI above. GitHub is OAuth 2.0, not OIDC: plugrelay reads `/user` and `/user/emails`. | client ID and secret. Only a *verified primary* email counts; the subject is the numeric GitHub user id. |
-| `feishu` / `lark` | open.feishu.cn / open.larksuite.com → developer console → create a self-built app; Security Settings → add the redirect URL; enable web login; for email add the scope `contact:user.email:readonly`. | App ID and App Secret as client ID and secret. The subject is `open_id`. Feishu/Lark contact emails are entered by tenant admins and never confirmed by the user, so they are not treated as verified unless **Trust the provider's email** is on; restrict sign-in with allowed tenants (`tenant_key`) instead. |
+| `oidc` | any provider with `/.well-known/openid-configuration` under its issuer. | issuer URL exactly as published. |
+| `github` | Settings → Developer settings → OAuth Apps → New OAuth App; callback URL = the URI above. OAuth 2.0, not OIDC: plugrelay reads `/user` and `/user/emails`. | client ID and secret. Only a *verified primary* email counts; the subject is the numeric user id. |
+| `feishu` / `lark` | open.feishu.cn / open.larksuite.com → developer console → self-built app; Security Settings → redirect URL; enable web login; for email add scope `contact:user.email:readonly`. | App ID and App Secret as client ID and secret; subject is `open_id`. Tenant admins type in contact emails and users never confirm them, so they are unverified unless **Trust the provider's email** is on. Restrict with allowed tenants (`tenant_key`) instead. |
 
 ### Turning password sign-in off
 
-Once SSO works, password sign-in can be switched off (site setting
-`security.password_login`). The relay refuses
-to switch it off unless an enabled provider exists and the admin doing it has
-signed in through one (an operator token may always do it), and it refuses to
-disable or delete the last enabled provider while passwords are off.
-Break-glass paths that always work:
+Once SSO works, turn passwords off with site setting
+`security.password_login`. The relay refuses unless an enabled provider
+exists and the admin signed in through one (an operator token always may),
+and it won't disable or delete the last enabled provider while passwords are
+off. Ways back in that always work:
 
 - `PLUGRELAY_ADMIN_TOKEN` (or a stored admin token):
   `curl -X PATCH -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"values":{"security.password_login": true}}' https://relay.example.com/api/v1/settings`
@@ -292,167 +263,126 @@ Break-glass paths that always work:
 
 ## Two-step sign-in, passkeys and captcha
 
-Each console user turns these on for themselves on the **Security** page
-(user menu → Security). Code: `internal/admin/mfa*.go`, `totp.go`,
-`webauthn.go`, `captcha.go`; factors live in the store (`user_totp`,
-`user_recovery_codes`, `user_passkeys`).
+Each user turns these on under user menu → **Security**. Code:
+`internal/admin/mfa*.go`, `totp.go`, `webauthn.go`, `captcha.go`; factors are
+stored in `user_totp`, `user_recovery_codes`, `user_passkeys`.
 
-- **Authenticator app (TOTP).** RFC 6238 with SHA-1, 6 digits, 30-second
-  steps, one step of clock drift either way. The secret is sealed with the
-  master key; the QR code is drawn in the browser. A code is good once: its
-  time step is spent on first use, across all nodes.
-- **Recovery codes.** Ten one-time codes, shown once when the first factor
-  is turned on and whenever they are regenerated; stored hashed.
-- **Passkeys (WebAuthn).** Registration with attestation `none` (the
-  attestation statement is not checked), ES256, EdDSA and RS256 keys, user
-  verification preferred. A passkey works as the second step after a
-  password and, with user verification, as a passwordless sign-in ("Sign in
-  with a passkey"), which is refused while password sign-in is off. The RP
-  ID is the host of the *Public base URL* setting and the only accepted
-  origin is that URL's origin; without one, only a loopback-only relay opened
-  at a loopback name offers passkeys, others refuse them
-  (`public_url_missing`). A signature counter that does
-  not grow is refused and logged as a possible cloned authenticator.
-  Implemented on the standard library, no WebAuthn dependency.
+| factor | details |
+|-|-|
+| authenticator app (TOTP) | RFC 6238, SHA-1, 6 digits, 30 s steps, ±1 step drift. Secret sealed with the master key; QR drawn in the browser. Each code works once, across all nodes. |
+| recovery codes | ten one-time codes, shown once when the first factor is added or when regenerated; stored hashed |
+| passkeys (WebAuthn) | attestation `none`, ES256 / EdDSA / RS256, user verification preferred. Works as the second step and, with user verification, as passwordless sign-in (refused while passwords are off). RP ID is the public URL's host, the only allowed origin is its origin; without a public URL only a loopback-only relay opened at a loopback name offers them (`public_url_missing`). A counter that doesn't grow is refused and logged as a possible clone. Standard library only. |
 
-With a factor on, `POST /api/v1/auth/login` answers 202 and sets only the
-`pr_mfa` cookie (five minutes, five answers); the session cookie comes after
-the second step (`POST /api/v1/auth/mfa`). Wrong codes count against the
-login limiter per address and per account. Single sign-on skips the second
-step — the identity provider usually enforces its own MFA — unless
-`security.require_2fa_sso` is on; then the callback sends the browser to
-`/login?mfa=1`.
+With a factor on, `POST /api/v1/auth/login` answers 202 with only the
+`pr_mfa` cookie (five minutes, five tries); the session comes after
+`POST /api/v1/auth/mfa`. Wrong codes count toward the login limiter per
+address and per account. SSO skips the second step (the provider usually
+has its own MFA) unless `security.require_2fa_sso` is on, which sends the
+browser to `/login?mfa=1`.
 
-Turning the authenticator app off, new recovery codes, adding or deleting
-a passkey, and an admin creating an admin, changing a user's password or
-role, disabling, re-enabling a disabled admin or deleting a user, or
-resetting their two-step sign-in need a sign-in or a re-confirmation (password, code
-or passkey) within the last five minutes (`POST /api/v1/me/reauth`).
+Sensitive changes need a sign-in or re-confirmation within five minutes
+(`POST /api/v1/me/reauth`): removing the authenticator app, new recovery
+codes, passkey changes; for admins, creating an admin, changing a user's
+password or role, disabling or deleting a user, re-enabling a disabled
+admin, resetting someone's two-step sign-in.
 
 Site settings (**Settings → Security**):
 
 | key | default | meaning |
 |-|-|-|
-| `security.require_2fa_admins` | off | admins must turn on an authenticator app or a passkey |
-| `security.require_2fa_grace_days` | 7 | days from when the rule turned on (or the account was created) before admin operations answer 403 `mfa_enrollment_required`; the admin's own pages stay open to enroll, with no admin powers on them. Admins who can only sign in by SSO are exempt unless `security.require_2fa_sso` is on |
-| `security.require_2fa_sso` | off | ask SSO sign-ins for the second step too |
-| `security.login_captcha_after` | 0 (off) | ask for a captcha on the password login after this many failures from an address within five minutes |
+| `security.require_2fa_admins` | off | admins must add an authenticator app or passkey |
+| `security.require_2fa_grace_days` | 7 | days after the rule turns on (or the account is created) before admin operations answer 403 `mfa_enrollment_required`; the admin can still open their own pages to enroll, without admin powers. SSO-only admins are exempt unless `security.require_2fa_sso` is on |
+| `security.require_2fa_sso` | off | SSO sign-ins also need the second step |
+| `security.login_captcha_after` | 0 (off) | captcha on password login after this many failures from one address in five minutes |
 | `security.captcha_provider` | `off` | `turnstile` (Cloudflare) or `hcaptcha` |
 | `security.captcha_site_key`, `security.captcha_secret` | | the provider's keys; the secret is sealed with the master key |
 
-The captcha token is verified server-side with the provider's siteverify
-endpoint through the core egress; when the provider cannot be reached the
-login fails closed (503 `captcha_unavailable`). Saving a provider without
-its site key and secret is refused; a captcha that is on but cannot run
-(for example, a secret sealed under another master key) also answers 503
-`captcha_unavailable` instead of skipping the check. The console's
-Content-Security-Policy allows a provider's script and frame origins only
-while that provider is chosen (here or for sign-up).
-Sign-up has its own captcha settings ([sell kit](sell-kit.md#sign-up-adminsignup)).
+The captcha token is checked server-side through the core egress. If the
+provider can't be reached, or the captcha is on but can't run (say, a secret
+sealed under another master key), login fails with 503
+`captcha_unavailable` instead of skipping the check. A provider can't be
+saved without both keys. The console's Content-Security-Policy allows a
+provider's scripts only while it is selected. Sign-up has its own captcha
+settings ([sell kit](sell-kit.md#sign-up-adminsignup)).
 
 Locked out: an admin removes a user's factors in the user drawer
 (`DELETE /api/v1/users/{id}/mfa`, audited as `user.mfa_reset`), or on the
-relay host `plugrelay user reset-2fa --user ops@example.com` does it against
-the database (also audited).
+relay host run `plugrelay user reset-2fa --user ops@example.com` (also
+audited).
 
 ## Graceful shutdown
 
-On SIGTERM or SIGINT the relay stops accepting connections and then:
+On SIGTERM or SIGINT the relay stops accepting connections, then:
 
-1. lets in-flight requests run for up to `shutdown.grace` (30 s), then
-   closes their connections;
-2. waits up to `shutdown.drain` (60 s) for the cut-off requests to settle
-   quota and for queued records to reach the sinks — the record queue gets
-   at least 10 s even when the requests used the whole drain;
+1. lets in-flight requests run up to `shutdown.grace` (30 s), then closes
+   them;
+2. waits up to `shutdown.drain` (60 s) for those requests to settle quota and
+   for queued records to reach the request log; the queue always gets at
+   least 10 s more;
 3. stops external plugins (up to 10 s) and closes the store.
 
-Records not written by then are logged and counted
-(`plugrelay_sink_ledger_records_total{outcome="lost"}`). Whatever runs the
-relay must wait longer than grace + drain + 30 s before it kills it — 120 s
-with the defaults:
+Records still unwritten are logged and counted
+(`plugrelay_sink_ledger_records_total{outcome="lost"}`). The process manager
+must wait longer than grace + drain + 30 s before killing it: 120 s with the
+defaults, more if you raise either.
 
-- Docker Compose: `stop_grace_period` (set to `120s` in
-  [`deploy/docker-compose.yml`](../deploy/docker-compose.yml)); `docker run`
-  needs `--stop-timeout 120` (its default is 10 s).
-- Kubernetes: `terminationGracePeriodSeconds: 120` in the pod spec (the
-  default is 30 s). A `preStop` hook counts against the same budget.
-- systemd: `TimeoutStopSec=120`.
-
-Raising `shutdown.grace` or `shutdown.drain` raises that figure with it.
+| runner | setting | its default |
+|-|-|-|
+| Docker Compose | `stop_grace_period: 120s` (set in [`deploy/docker-compose.yml`](../deploy/docker-compose.yml)) | 10 s |
+| `docker run` | `--stop-timeout 120` | 10 s |
+| Kubernetes | `terminationGracePeriodSeconds: 120`; a `preStop` hook counts against it | 30 s |
+| systemd | `TimeoutStopSec=120` | |
 
 ## Security checklist
 
-- [ ] TLS in front of anything that is not loopback; `listen` stays on
-      loopback behind the proxy, or the published port is bound to
-      `127.0.0.1`.
-- [ ] `security.local_owner_login` off for anything shared (setup's "team"
-      and "sell" answers and `init --admin-email` turn it off) — on, it
-      trusts loopback requests without a login.
-- [ ] The proxy forwards the original `Host`.
-- [ ] `trusted_proxies` lists only your proxies, or is empty when nothing
-      sits in front of the relay.
-- [ ] Setup wizard completed immediately after the first start; no default
-      admin exists, so nobody else should reach `/setup` first.
-- [ ] Master key generated by `plugrelay init` or `openssl rand -base64 32`,
-      file mode 0600 or a secret store, backed up separately from the
-      database.
-- [ ] `PLUGRELAY_ADMIN_TOKEN` long and random if set; it grants full admin.
-- [ ] Two-step sign-in: `security.require_2fa_admins` on for shared relays;
-      the public URL set so passkeys work; recovery codes stored by each admin.
-- [ ] Public sign-up or a login page open to the internet: a captcha
-      configured (`security.login_captcha_after`, `admin.signup`
-      `captcha_provider`).
-- [ ] Single sign-on: the public URL set; allowed domains or tenants set for
-      providers anyone can sign up at (Google, GitHub, Microsoft
-      `organizations`, Feishu/Lark); *trust email* only when the provider's
-      emails are really controlled.
-- [ ] `egress.allow_private_cidrs` lists only the ranges self-hosted upstreams
-      need — it opens the SSRF guard for them.
-- [ ] External plugins off (`external_plugins.enabled: false`) unless you
-      trust every plugin in the directory; they run with the relay's OS user.
-- [ ] Request bodies are not logged (`body_logging` and every group's `log_bodies` off, the default) unless
-      users have agreed to it.
-- [ ] Only upstream accounts you own and whose terms allow your use (resale
-      in particular). plugrelay does not pool subscriptions or impersonate
-      clients.
-- [ ] Release artifacts verified: checksums, cosign signatures, SBOM
-      (`.goreleaser.yaml`).
+- [ ] TLS in front of anything not on loopback; behind the proxy, `listen` or the published port stays on `127.0.0.1`.
+- [ ] `security.local_owner_login` off for anything shared (the setup wizard's "A team" and "Selling" answers and `init --admin-email` do this).
+- [ ] The proxy forwards the original `Host`; `trusted_proxies` lists only your proxies, or is empty.
+- [ ] Setup wizard finished right after first start; there is no default admin.
+- [ ] Master key from `plugrelay init` or `openssl rand -base64 32`, mode 0600 or in a secret store, backed up apart from the database.
+- [ ] `PLUGRELAY_ADMIN_TOKEN`, if set, is long and random; it is full admin.
+- [ ] Shared relays: `security.require_2fa_admins` on, public URL set (for passkeys), each admin keeps their recovery codes.
+- [ ] Public sign-up or an internet-facing login: captcha on (`security.login_captcha_after`, `admin.signup` `captcha_provider`).
+- [ ] SSO: public URL set; allowed domains or tenants for providers anyone can join (Google, GitHub, Microsoft `organizations`, Feishu/Lark); *trust email* only when you control the provider's emails.
+- [ ] `egress.allow_private_cidrs` lists only what self-hosted upstreams need; it opens the SSRF guard.
+- [ ] External plugins off unless you trust every plugin in the directory; they run as the relay's OS user.
+- [ ] Bodies not logged (`body_logging` and every group's `log_bodies` off, the default) unless users agreed.
+- [ ] Only upstream accounts you own and whose terms allow your use, resale in particular.
+- [ ] Release artifacts verified: checksums, cosign signatures, SBOM (`.goreleaser.yaml`).
 
 ## Backups
 
 | what | how | note |
 |-|-|-|
-| master key | copy `master.key` / the secret | without it, credential secrets and secret settings in any backup are unreadable |
-| SQLite | `sqlite3 plugrelay.db ".backup 'plugrelay-$(date +%F).db'"` while running | the database runs in WAL mode; copy with `.backup`, not `cp` |
+| master key | copy `master.key` / the secret | without it, secrets in any backup are unreadable |
+| SQLite | `sqlite3 plugrelay.db ".backup 'plugrelay-$(date +%F).db'"` while running | WAL mode: use `.backup`, not `cp` |
 | PostgreSQL | `pg_dump -Fc plugrelay > plugrelay.dump` | includes the request log |
 | MySQL | `mysqldump --single-transaction plugrelay > plugrelay.sql` | includes the request log |
-| business data only | `plugrelay export -o relay-data.yaml` (`--with-secrets` for credentials) | portable YAML; no users, keys or logs; restore with `plugrelay apply -f` |
-| state | nothing | memory/Redis state is disposable: losing it costs cache hits and counters |
+| business data only | `plugrelay export -o relay-data.yaml` (`--with-secrets` for credentials) | portable YAML without users, keys or logs; restore with `plugrelay apply -f` |
+| state | nothing | disposable: losing it costs cache hits and counters |
 
 ## Upgrading
 
-1. Read the release notes on [GitHub Releases](https://github.com/initxy/plugrelay/releases)
+1. Read the [release notes](https://github.com/initxy/plugrelay/releases)
    ([how they are written](releasing.md)).
 2. Back up the database and the master key.
-3. Replace the binary or image tag and restart. Migrations are embedded and
-   applied when the store opens; a downgrade after a migration needs the
-   backup.
-4. `plugrelay doctor` checks config, master key, database and listen address.
-5. Several nodes: upgrade one node first; the others keep serving.
+3. Swap the binary or image tag and restart. Migrations run when the store
+   opens; downgrading past a migration needs the backup.
+4. Run `plugrelay doctor` (config, master key, database, listen address).
+5. With several nodes, upgrade one first; the rest keep serving.
 
-On PostgreSQL and MySQL migrations run under a database lock, so several
-nodes may start at once. MySQL commits each DDL statement on its own: a
-migration that fails halfway leaves its finished statements behind and
-needs the backup (or a manual cleanup) before the next start.
+On PostgreSQL and MySQL, migrations hold a database lock, so nodes may start
+together. MySQL commits each DDL statement separately: a migration that fails
+halfway leaves part of itself behind and needs the backup or a manual
+cleanup before the next start.
 
 ## Master key rotation
 
-Put the old key in `previous_master_keys` (or
-`PLUGRELAY_PREVIOUS_MASTER_KEYS`) and the new one in `master_key`. Seals
-made under the old key still open, so conversations keep their private state
+Put the old key in `previous_master_keys` (`PLUGRELAY_PREVIOUS_MASTER_KEYS`)
+and the new one in `master_key`. Private state sealed under the old key still
+opens, so conversations keep working
 ([ADR-0003](adr/0003-seal-private-state-with-master-key.md)). Nothing stored
-is re-encrypted: every secret in the database (credentials, secret settings
-such as the captcha and payment keys, SSO, MCP and notification secrets,
-authenticator-app secrets) stays readable only with the key it was saved
-under. After the change, re-enter them; users re-enroll their authenticator
-app.
+is re-encrypted: credentials, secret settings (captcha, payment keys), SSO,
+MCP and notification secrets and authenticator-app secrets stay readable
+only with the key they were saved under. Re-enter them after the change;
+users re-enroll their authenticator app.

@@ -2,8 +2,7 @@
 
 [English](README.md) | 简体中文
 
-用 Go 写 plugrelay 的外部进程插件。这个包就在 plugrelay 模块里：
-`github.com/initxy/plugrelay/sdk/go/pluginsdk`。
+用 Go 写 plugrelay 外部进程插件的 SDK：`github.com/initxy/plugrelay/sdk/go/pluginsdk`，就在 plugrelay 模块里。
 
 ```go
 package main
@@ -47,21 +46,18 @@ request_body: true
 <a id="what-you-get"></a>
 ## 提供了什么
 
-- `Serve` 在 stdio 上讲协议；清单设置了 `transport: unix` 时，改在 `PLUGRELAY_SOCKET`
-  指定的 unix socket 上讲。
+- `Serve` 在 stdio 上收发协议消息；清单设了 `transport: unix` 时改用 `PLUGRELAY_SOCKET` 指定的 unix socket。
 - 每个方法一个带类型的注册函数：`Authenticate`、`OnRequest`、`OnAttempt`、`OnFinish`、
   `Rank`、`Meter`、`Consume`、`RunJob`、`AdminHandle`、`Endpoints`、`Prepare`、`Classify`、
-  `Send`、`ListModels`、`Refresh`；其他方法用 `Handle`（比如 `provider.quota`）。
-- 处理函数并发运行；宿主发来 `$/cancelRequest` 或调用超时时，它们的 context 会被取消。
-- `Host()` 用来回调 plugrelay：`Log`、`KVGet`/`KVPut`/`KVDelete`/`KVIncr`、`HTTP`
-  （遵守中转的出站规则）。要在 `permissions.host` 下声明 `kv` 和 `http`。
-- `Deny(kind, msg)`（作为回复返回）和 `Reject(kind, msg)`（作为错误返回）是有意的拒绝，
-  会原样交给客户端；其他错误都算插件故障，宿主按插件的 `fail_policy` 处理。
-- `Call.SetState` 把一个值交给本插件在同一个请求里后续的钩子（用 `Call.State` 取）。
-- 给 provider 用的流辅助函数：`StartEvent`、`TextBlockEvents`、`DoneEvent`、`ErrorEvent`。
+  `Send`、`ListModels`、`Refresh`。其余的用 `Handle`（比如 `provider.quota`）。
+- 处理函数并发运行。宿主发来 `$/cancelRequest` 或调用超时，它们的 context 就会取消。
+- `Host()` 回调 plugrelay：`Log`、`KVGet`/`KVPut`/`KVDelete`/`KVIncr`，以及经中转出站规则发请求的 `HTTP`。
+  `kv` 和 `http` 要写在 `permissions.host` 下。
+- `Deny(kind, msg)`（作为回复）和 `Reject(kind, msg)`（作为错误）原样交给客户端；其他错误都算插件故障，按 `fail_policy` 处理。
+- `Call.SetState` 把一个值交给本插件在同一请求里后面的钩子，它们从 `Call.State` 读。
+- provider 用的流辅助函数：`StartEvent`、`TextBlockEvents`、`DoneEvent`、`ErrorEvent`。
 
-stdio 模式下千万别往 stdout 打印：那上面跑的是协议。用 stderr 或 `Host().Log`。
+stdio 模式下 stdout 专门走协议，千万别往上打印；用 stderr 或 `Host().Log`。
 
-测 provider 用 `pkg/plugin/plugintest`；完整的 provider 示例见
-`examples/plugins/echo-provider-go`，协议契约（消息格式和交互规则）见
-[`../PROTOCOL.md`](../PROTOCOL.zh-CN.md)。
+测 provider 用 `pkg/plugin/plugintest`。完整的 provider 例子：`examples/plugins/echo-provider-go`。
+协议细节：[`../PROTOCOL.md`](../PROTOCOL.zh-CN.md)。

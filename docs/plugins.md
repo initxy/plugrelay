@@ -2,13 +2,12 @@
 
 English | [简体中文](plugins.zh-CN.md)
 
-Everything that is policy rather than mechanism — upstreams, authentication,
-rate limits, budgets, ordering of candidates, logging — is a plugin. Plugins
-attach to fixed extension points and are written in one of three ways; to the
-core all three look the same. Operators do not switch built-in plugins one by
-one: they switch features ([configuration](configuration.md#features)); a
-plugin outside them is an extension. Terms: [`CONTEXT.md`](../CONTEXT.md). Where
-plugins sit in a request: [architecture](architecture.md#plugin-system-features-modules-extensions).
+Upstreams, auth, rate limits, budgets, candidate ordering and logging are all
+plugins on fixed extension points, written in one of three ways that the core
+treats alike. Operators switch features, not single built-in plugins
+([configuration](configuration.md#features)); a plugin outside any feature is
+an extension. Where plugins run: [architecture](architecture.md#plugin-system-features-modules-extensions).
+Terms: [`CONTEXT.md`](../CONTEXT.md).
 
 - [Choosing a tier](#choosing-a-tier)
 - [Declarative upstream manifests](#declarative-upstream-manifests)
@@ -20,42 +19,36 @@ plugins sit in a request: [architecture](architecture.md#plugin-system-features-
 
 ## Choosing a tier
 
-| you want to… | write | why |
+| you want to… | write | |
 |-|-|-|
-| add an upstream that speaks a supported protocol (OpenAI chat or responses, Anthropic, Gemini) with its own URL, auth header, quirks and error codes | a **YAML manifest** | no code; validated by JSON Schema |
-| add an upstream with a private protocol, a guardrail calling an external service, an IP allowlist, a custom meter, a job, admin routes — in any language | an **external process plugin** | runs out of process with its own crash domain; a Go SDK, and the protocol for any other language |
-| touch every streamed event, add a protocol codec, or need the lowest overhead | a **built-in Go plugin** | compiled in; the only tier with `OnEvent` and codecs |
+| add an upstream that speaks OpenAI chat/responses, Anthropic or Gemini, with its own URL, auth, quirks and error codes | a **YAML manifest** | no code; checked by JSON Schema |
+| add a private-protocol upstream, a call to an outside service, an IP allowlist, a meter, a job, admin routes — in any language | an **external process plugin** | own process, own crash domain; Go SDK or the wire protocol |
+| touch every streamed event, add a protocol codec, or run with the least overhead | a **built-in Go plugin** | compiled in; the only tier with `OnEvent`, `OnResponse` and codecs |
 
-Extension points (`pkg/plugin/points.go`) and the tiers that can implement
-them:
+Extension points (`pkg/plugin/points.go`):
 
 | point | does | manifest | external | built-in |
 |-|-|-|-|-|
-| `provider` | an upstream: endpoints, owned headers, `Prepare`, `Classify` → verdict; optional model list, credential refresh, quota probe, own `Send` | yes | yes | yes |
+| `provider` | an upstream: endpoints, owned headers, `Prepare`, `Classify` → verdict; optionally model list, credential refresh, quota probe, its own `Send` | yes | yes | yes |
 | `auth` | identify the caller | | yes | yes |
-| `middleware` | `OnRequest`, `OnAttempt`, `OnFinish`, `MutateBody`; `OnEvent` and `OnResponse` built-in only | | yes (no `OnEvent`, `OnResponse`) | yes |
-| `selector` | reorder candidates (never add); an enabled one ranks instead of the built-in routing strategy | | yes | yes |
+| `middleware` | `OnRequest`, `OnAttempt`, `OnFinish`, `MutateBody`, `OnEvent`, `OnResponse` | | `OnRequest`, `OnAttempt` (headers only), `OnFinish`; no body edits | yes |
+| `selector` | reorder candidates, never add; an enabled one replaces the built-in routing strategy | | yes | yes |
 | `meter` | `Reserve` / `Settle` / `Refund`, all idempotent | | yes | yes |
-| `sink` | consume finished request records asynchronously | | yes | yes |
+| `sink` | consume finished request records, asynchronously | | yes | yes |
 | `job` | run on a schedule | | yes | yes |
-| `admin` | mount HTTP routes under `/api/plugins/<id>/` | | yes | yes |
-| (optional, any kind) | `UserDeleteHook`: end what a user has running before the user is deleted; `SettingsCheck`: refuse a plugin settings change (409; console save, `plugrelay apply`, new-api import), and turning itself on over stored settings it would refuse; external plugins are not loaded by `plugrelay apply`, so theirs do not run there | | | yes |
+| `admin` | HTTP routes under `/api/plugins/<id>/` | | yes | yes |
+| any kind, optional | `UserDeleteHook` ends what a user has running before the user is deleted; `SettingsCheck` refuses a settings change (409, from the console, `plugrelay apply` or new-api import) and refuses to switch its plugin on over stored settings it would reject | | | yes |
 
-Protocol codecs are not plugins of this API; they implement
-`pkg/protocol.Codec` and are compiled in.
+Protocol codecs are not plugins: they implement `pkg/protocol.Codec` and are
+compiled in.
 
 ## Declarative upstream manifests
 
-A manifest describes one upstream; a generic provider interprets it. Official
-manifests live in [`manifests/`](../manifests) (the vendor list is in the
-[README](../README.md); `plugrelay manifest list` prints them), each with the
-vendor docs it was checked against in its header comment. Self-hosted ones
-name their address variable one of two ways: `server_url` is the server root
-without `/v1`, used when the server also has routes outside `/v1` (Anthropic,
-rerank); `base_url` includes `/v1`. Each manifest's `variables:` says which,
-with a description, and the console shows them as form fields. The schema is
-[`manifests/schema.json`](../manifests/schema.json); the Go types and every
-field's meaning are in `plugins/provider/manifest/manifest.go`.
+A manifest describes one upstream; a generic provider runs it. Official ones
+are in [`manifests/`](../manifests) (`plugrelay manifest list`), each citing
+the vendor docs it was checked against. Schema:
+[`manifests/schema.json`](../manifests/schema.json); field meanings:
+`plugins/provider/manifest/manifest.go`.
 
 ```yaml
 id: acme                      # unique; also the default issuer group
@@ -115,26 +108,14 @@ quota:                        # optional probe, run by job.quotaprobe
   reset_period: data.period            # used when reset is empty: daily | weekly | monthly (00:00 UTC)
 ```
 
-Notes:
-
-- `freeform_tools` (OpenAI custom tools such as Codex's `apply_patch`) is off
-  for every manifest unless it declares `freeform_tools: true`, whatever the
-  codec's default: OpenAI-compatible servers reject them, and the relay sends
-  them as function tools instead. Only `openai` and `azure-openai` declare it.
-- `{name}` placeholders are filled from the upstream instance's config or the
-  variable's default; `{model}` in `path` is the upstream model name (Azure
-  deployments). See `manifests/azure-openai.yaml`.
-- Verdict causes: `request`, `transient`, `rate_limit`, `quota`,
-  `auth_expired`, `banned`, `content`, `unknown`. Credential actions: `keep`,
-  `cooldown`, `cool_until_reset`, `refresh`, `quarantine`, `manual`. Retry:
-  `none`, `next`, `downgrade` (with `downgrade:` edits). Signals are
-  `ir.ErrorKind` values (`pkg/ir/error.go`). Validation refuses rules that
-  would break the hard rules — e.g. retrying a content rejection or changing
-  the credential for a request error.
-- Upstream URLs are subject to the SSRF guard; self-hosted endpoints need
-  `egress.allow_private_cidrs` ([configuration](configuration.md#egress)).
-
-Validate and use:
+| topic | rule |
+|-|-|
+| placeholders | `{name}` comes from the upstream's config, else the variable's default; `{model}` in `path` is the upstream model name (Azure deployments, `manifests/azure-openai.yaml`) |
+| self-hosted address | `base_url` includes `/v1`; `server_url` is the server root, for servers with routes outside `/v1` (Anthropic, rerank). The console shows `variables:` as form fields |
+| verdicts | causes `request`, `transient`, `rate_limit`, `quota`, `auth_expired`, `banned`, `content`, `unknown`; credential `keep`, `cooldown`, `cool_until_reset`, `refresh`, `quarantine`, `manual`; retry `none`, `next`, `downgrade` (with `downgrade:` edits); signals are `ir.ErrorKind` (`pkg/ir/error.go`). Rules that break the hard rules (retrying a content rejection, touching the credential on a request error) fail validation |
+| `freeform_tools` | OpenAI custom tools (Codex's `apply_patch`) are sent as function tools unless the manifest declares `freeform_tools: true`; only `openai` and `azure-openai` do |
+| private addresses | blocked by the SSRF guard; self-hosted endpoints need `egress.allow_private_cidrs` ([configuration](configuration.md#egress)) |
+| issuer groups | default to the manifest id; an endpoint whose `base_url` comes from a variable gets its own group per upstream, so two self-hosted instances never share private state |
 
 ```bash
 plugrelay manifest validate acme.yaml        # or a directory
@@ -144,32 +125,23 @@ plugrelay upstream add --manifest azure-openai --id azure-eu --credential-env AZ
 plugrelay upstream add --manifest vllm --var base_url=http://10.0.0.5:8000/v1   # no key
 ```
 
-An upstream is keyless when its manifest sets `auth.key_optional: true`
-(the self-hosted servers, the LiteLLM and Bifrost gateways, the custom
-`openai-compatible`) and it has no credentials at all: the router routes it
-as one shared credential with id `""` and sends no auth header. Leaving out
-`--credential-env`, or the key in the console's add form for such a server,
-gives one. Every other upstream with no credentials has no route: deleting
-a cloud upstream's last key stops it, it never goes out unauthenticated,
-and the console marks it "not routed: needs a key". A stored credential that cannot be
-decrypted stays listed as disabled ("cannot be opened") and never makes its
-upstream keyless.
+`upstream add` takes official manifests and ones already in the database.
+Store your own with `plugrelay apply` (`manifests:` entries, YAML inline); the
+console and `GET /api/v1/manifests` list manifests but cannot upload one.
 
-`upstream add` takes official manifests and manifests already stored in the
-database. A manifest file of your own is stored through `plugrelay apply`
-(`manifests:` entries with the YAML inline); the console and the admin API
-list manifests (`GET /api/v1/manifests`) but cannot upload one.
-
-Issuer groups default to the manifest id; an endpoint whose `base_url` comes
-from a variable gets its own issuer group per upstream, so two self-hosted
-instances never share private state.
+**Keyless upstreams.** With `auth.key_optional: true` (self-hosted servers,
+the LiteLLM and Bifrost gateways, the custom `openai-compatible`) and no
+credentials, an upstream is routed as one shared credential with id `""` and
+no auth header; leave out `--credential-env` or the console key to get one.
+Any other upstream without credentials is not routed ("not routed: needs a
+key"), never sent unauthenticated. A credential that cannot be decrypted is
+listed as disabled ("cannot be opened") and never makes its upstream keyless.
 
 ### Cloud platforms: Bedrock and Vertex AI
 
-Their authentication cannot be written as a header, so their manifests name
-interpreters backed by Go code: `bedrock` (`plugins/provider/bedrock`) and
-`vertex` (`plugins/provider/vertex`). The package docs list the wire
-differences each one handles. To the operator they are ordinary manifests:
+Their auth is not a header, so their manifests use Go interpreters, `bedrock`
+and `vertex` (`plugins/provider/<name>`; package docs list the wire
+differences). Otherwise they are ordinary manifests:
 
 | manifest | variables | credential secret | issuer |
 |-|-|-|-|
@@ -183,72 +155,52 @@ export VERTEX_KEY="$(cat service-account.json)"
 plugrelay upstream add --manifest vertex-anthropic --credential-env VERTEX_KEY --var location=us-east5
 ```
 
-- Point each model's route at the platform's id as the upstream model
-  name (`us.anthropic.claude-…` inference profiles or ARNs on Bedrock,
-  `claude-…@YYYYMMDD` on Vertex). Neither manifest lists models or prices.
-- Anthropic API, Bedrock and Vertex never accept each other's thinking
-  signatures, and the Gemini API and Vertex Gemini are kept apart too, so
-  each has its own issuer group.
-- Bedrock: token counting is answered locally; Anthropic server tools are
-  not offered there. Calls are made by the provider itself (`plugin.Sender`)
-  through the attempt's egress (`Outgoing.Client`), so the credential's or
-  upstream's proxy carries them.
-- Vertex: access tokens are cached per credential and replaced five minutes
-  before they expire; a 401 drops the token and the core refreshes the
-  credential. The token exchange takes the credential's egress too.
+No model list or prices: set each route's upstream model name to the platform
+id (`us.anthropic.claude-…` profiles or ARNs on Bedrock, `claude-…@YYYYMMDD` on
+Vertex). Separate issuers, because Anthropic API, Bedrock and Vertex reject
+each other's thinking signatures (Gemini API and Vertex Gemini are kept apart
+too). Bedrock counts tokens locally, offers no Anthropic server tools and
+sends calls itself (`plugin.Sender`) through `Outgoing.Client`. Vertex caches
+access tokens per credential, renews them five minutes before expiry and drops
+one on a 401 so the core refreshes the credential; the token exchange uses the
+credential's egress.
 
 ## External process plugins
 
 An external plugin is a directory with a `plugin.yaml` and an executable.
-plugrelay starts it, speaks JSON-RPC 2.0 over stdio (LSP-style framing) or a
-unix socket, restarts it with backoff if it crashes, and applies its
-`fail_policy` when it fails or times out. The core sees it as
-`<kind>.<id>`.
+plugrelay starts it, talks JSON-RPC 2.0 over stdio (LSP-style framing) or a
+unix socket, restarts it with backoff after a crash, and applies its
+`fail_policy` when it fails or times out. The core sees it as `<kind>.<id>`.
 
-- The contract — framing, lifecycle, every method, host calls, error codes,
-  the full `plugin.yaml` reference — is [`sdk/PROTOCOL.md`](../sdk/PROTOCOL.md).
-  `sdk/plugin.schema.json` validates `plugin.yaml` in editors.
-- Turn the tier on with `external_plugins.enabled: true` and point
-  `external_plugins.dir` at a directory of plugin directories
-  ([configuration](configuration.md#external_plugins)).
-- Installing a plugin means trusting it: it runs with plugrelay's OS user and
-  its own network and file access. `permissions` in `plugin.yaml` are shown to
-  the admin but not enforced, except `permissions.host`, which gates host APIs
-  (KV, HTTP through the core egress).
-
-External plugins are extensions: they start disabled; an admin approves the
-host APIs they declare, turns them on and sets their order
-(`PATCH /api/v1/extensions/{id}`, the console's Extensions list, or
-`plugins:` in `plugrelay apply`), in the same chain as built-in plugins
-(`internal/app/plugins.go`).
+| | |
+|-|-|
+| contract | wire protocol and full `plugin.yaml` reference in [`sdk/PROTOCOL.md`](../sdk/PROTOCOL.md); `sdk/plugin.schema.json` validates `plugin.yaml` in editors |
+| enabling | `external_plugins.enabled: true` and `external_plugins.dir` ([configuration](configuration.md#external_plugins)). Each plugin starts disabled; an admin approves its host APIs, turns it on and orders it in the same chain as built-in plugins (`PATCH /api/v1/extensions/{id}`, the console's Extensions list, or `plugins:` in `plugrelay apply`) |
+| trust | it runs as plugrelay's OS user with its own network and file access. Only `permissions.host` (KV, HTTP through the core egress) is enforced; other `permissions` are just shown to the admin |
 
 ### SDK quickstarts
 
-The Go SDK is `github.com/initxy/plugrelay/sdk/go/pluginsdk`
-([README](../sdk/go/README.md), with a complete example). Other languages
-implement [`sdk/PROTOCOL.md`](../sdk/PROTOCOL.md) directly. The
-[`examples/plugins`](../examples/plugins) are runnable references:
-[`echo-provider-go`](../examples/plugins/echo-provider-go), a provider that
-streams back the last user message, and
-[`ip-allowlist-go`](../examples/plugins/ip-allowlist-go), a
-`middleware.onRequest` CIDR allowlist.
+Go: `github.com/initxy/plugrelay/sdk/go/pluginsdk` ([README](../sdk/go/README.md),
+with a full example). Other languages implement [`sdk/PROTOCOL.md`](../sdk/PROTOCOL.md).
+Runnable [`examples/plugins`](../examples/plugins):
+[`echo-provider-go`](../examples/plugins/echo-provider-go) streams back the
+last user message; [`ip-allowlist-go`](../examples/plugins/ip-allowlist-go)
+is a `middleware.onRequest` CIDR allowlist.
 
-Rules that bite:
-
-- In stdio mode, anything but protocol frames on stdout breaks the
-  connection; log to stderr.
-- A deliberate refusal is `deny(...)` / `reject(...)` and goes to the client
-  as is; any other error is a plugin failure and the `fail_policy` applies.
-- There is no `middleware.onEvent` across the process boundary.
-- The process gets a minimal environment (`PATH`, `HOME`, locale, `TMPDIR`,
-  `TZ`, the manifest's `env`, `PLUGRELAY_PLUGIN_ID`, …), not the relay's.
+| things that bite | |
+|-|-|
+| stdout | in stdio mode anything on stdout but protocol frames breaks the connection; log to stderr |
+| errors | `deny(...)` / `reject(...)` reach the client as is; any other error is a plugin failure and `fail_policy` applies |
+| limits | no `middleware.onEvent`; middleware cannot change the request body |
+| environment | minimal (`PATH`, `HOME`, locale, `TMPDIR`, `TZ`, the manifest's `env`, `PLUGRELAY_PLUGIN_ID`, …), not the relay's |
+| `plugin.yaml` | `reports_off_box` and `requires` work like `ReportsOffBox` and `Requires` [below](#built-in-go-plugins) |
+| `plugrelay apply` | does not load external plugins, so it cannot check their settings |
 
 ## Built-in Go plugins
 
-Built-in plugins live in `plugins/<kind>/<name>` and are linked by
-`plugins/builtin`. They import only `pkg/...` and `plugins/internal/...`
-(`plugins/boundary_test.go`) and receive core services through the
-`plugin.Host` passed to `Init`.
+Built-in plugins live in `plugins/<kind>/<name>`, import only `pkg/...` and
+`plugins/internal/...` (`plugins/boundary_test.go`), and get core services
+from the `plugin.Host` passed to `Init`.
 
 ```go
 package quiet
@@ -282,193 +234,104 @@ func (*Quiet) OnRequest(c *plugin.Call) (*plugin.Reply, error) {
 }
 ```
 
-- **Register** from `init`; registering a plugin makes it available, not
-  running. Add the import to `plugins/builtin/builtin.go` and place it in
-  `internal/features`: a core module (always runs) or a module of a feature
-  (runs while the feature is on); `TestEveryBuiltinPlaced` fails otherwise.
-  A third-party Go plugin needs a custom build that imports it; it is an
-  extension, switched on its own.
-- **Info**: `ID` is `<kind>.<name>`. `Settings` declares what the core
-  merges ([layered settings](configuration.md#layered-plugin-settings)) and
-  what forms show: `Label` and `Help` in English and Chinese, `EnumLabels`
-  for enum values, `Unit: plugin.UnitMoney` for micro-units (shown and taken
-  in currency units by the admin API); `TestSettingsLabelled` requires them
-  on every built-in setting. A feature lists which of its modules' settings
-  its form shows. `Mutates` lists the request fields the plugin may edit; a
-  plugin declaring none is read-only, which keeps passthrough byte-exact.
-  `ReportsOffBox` marks a plugin that sends
-  data off the box; `PLUGRELAY_TEST_MODE` never starts it. `Requires` lists
-  plugins it cannot work without (`meter.quota` requires `sink.requestlog`,
-  which its budgets are summed from): the core turns them on with it. If
-  one is not installed, a dependent that fails closed (such as `meter.quota`) stops the relay from starting, or the
-  reload from applying; any other dependent is turned off and the conflict
-  logged. A sink with `FailPolicy: closed` is a ledger with a queue of its
-  own, so a slow one delays nobody else: the core never drops its records
-  when that queue is full (it waits, then writes the record from the
-  finishing request itself) and retries failed writes with backoff, so the
-  same `Record.ID` may arrive more than once and the sink must skip an id it
-  already stored. Records still undelivered when the shutdown deadline
-  passes are logged and counted as lost. Other sinks may lose records under
-  overload. External plugins declare the same with
-  `reports_off_box` and `requires` in `plugin.yaml`.
-- **Authenticators and `/native`**: `/native` forwards the client's query
-  and headers minus the ones the core knows carry the platform key
-  (`Authorization`, `x-api-key`, `x-goog-api-key`, `?key=`). An external
-  auth plugin that reads the key from anywhere else must not be combined
-  with `/native` grants, or that key reaches the upstream.
-- **Init failures**: a plugin whose `Init` fails is skipped and shown as
-  `crashed` in the console, and so is every plugin that requires it; this
-  holds for fail-closed plugins too (a skipped `meter.quota` enforces no
-  budget), so watch plugin status after a deploy.
-- **Shared state**: `plugin.StateHost.State()` gives counters, slots and
-  locks shared by every node; each plugin's keys are namespaced, so one
-  plugin cannot touch another's.
-- **Interfaces**: implement any of `plugin.RequestHook`, `AttemptHook`,
-  `EventHook` (+ `EventHolder`), `ResponseHook` (a complete response before it is sent; may
-  edit it or refuse it), `FinishHook`, `BodyMutator` (middleware); `Authenticator`,
-  `Selector`, `Meter` (+ `QuotaHeaders`), `Sink`, `Job`, `Admin`,
-  `Provider` (+ `ModelLister`, `Refresher`, `QuotaProber`, `Sender`).
-  `Initializer` and `Closer` for setup and teardown. A Host implementing
-  `plugin.NoticeHost` takes `Notify(plugin.Notice)` for the notifications
-  feature ([notifications](notifications.md)); it never blocks.
-- **Host**: scoped logger, egress clients, plugin-scoped `KV`, global
-  settings, usage reader, version. A plugin never opens its own
-  connections (`plugins/boundary_test.go`); it takes one of three clients,
-  all with the SSRF guard and no redirects:
-  - `Outgoing.Client` — a provider's own calls during an attempt (a token
-    exchange in `Prepare`, a `Sender`'s request): the credential's fixed
-    proxy under the attempt's timers.
-  - `Host.ClientFor(upstream, credential)` — calls for an upstream outside a
-    request (`ListModels`, `Quota`, `Refresh`): the credential's proxy, else
-    the upstream's, with the upstream's timeouts. The proxy comes from the
-    relay's configuration, not from the credential passed in.
-  - `Host.HTTPClient` — direct, for traffic that belongs to no upstream;
-    providers never use it.
+**Registering** makes a plugin available, not running. Import it in
+`plugins/builtin/builtin.go` and place it in `internal/features` as a core
+module (always runs) or a feature's module (`TestEveryBuiltinPlaced` checks).
+A third-party Go plugin needs a custom build and is an extension.
 
-  A configured proxy that is down fails the call; nothing falls back to a
-  direct connection (hard rule 15). External plugins get the same through
-  `host.http` with `upstream_id` / `credential_id`
-  ([`sdk/PROTOCOL.md`](../sdk/PROTOCOL.md)).
-- **Credential refresh**: on a `refresh` verdict the core takes a
-  cluster-wide lock for the credential, calls the provider's `Refresher`,
-  stores the new secret and expiry, returns the credential to rotation and
-  resends the attempt once with it. Without a `Refresher` (or when the
-  refresh fails) the credential sits out for a minute. If the store refuses
-  the new secret after a few retries, the request is still served with it,
-  the credential is flagged for attention in the console (it stays in
-  rotation), `plugrelay_credential_secret_save_failures_total` counts it and
-  the save is retried every minute; until it lands, a restart of that node
-  loses the secret (`internal/pipeline/refresh.go`).
-- **Quota probe**: `job.quotaprobe` (always running) calls `QuotaProber.Quota`
-  for every credential of an enabled upstream, once per its interval (the
-  upstream's `quota_probe`, else the job's `interval`, 10m), on one node at a
-  time, through `Host.ClientFor`. The reading is shared router state: it
-  fills `Candidate.QuotaReset` for the `quota_reset` routing strategy, shows as a quota
-  bar on the credential, and a `remaining` of 0 keeps the credential out until
-  `reset_at`. Return `plugin.ErrNoQuota` for an upstream you cannot probe.
-- **Request log notes**: `Call.Note(text)` adds a line to the diagnostic of
-  the attempt that answered (else the last one); notes made in `OnFinish`
-  come too late. A built-in plugin that is a `prometheus.Collector` has its
-  series served on `/metrics` while `sink.metrics` runs.
-- **Two-path edits**: a plugin that changes requests implements
-  `MutateBody` (patch tier, sjson on declared paths only) and edits the IR
-  from `Call.Request()` in `OnAttempt` (convert tier).
-  `plugins/middleware/parampolicy` is the reference.
+| `plugin.Info` field | meaning |
+|-|-|
+| `ID` | `<kind>.<name>` |
+| `Settings` | what the core merges ([layered settings](configuration.md#layered-plugin-settings)) and forms show: `Label`/`Help` in English and Chinese, `EnumLabels` for enums, `Unit: plugin.UnitMoney` for micro-units (the admin API uses currency units). `TestSettingsLabelled` checks every built-in setting. A feature picks which settings its form shows |
+| `Mutates` | request fields it may edit; none = read-only, which keeps passthrough byte-exact |
+| `FailPolicy` | `closed` or `open`; per-kind defaults in [architecture](architecture.md#plugin-system-features-modules-extensions) |
+| `ReportsOffBox` | sends data off the box; never started under `PLUGRELAY_TEST_MODE` |
+| `Requires` | plugins it cannot work without, turned on with it (`meter.quota` sums budgets from `sink.requestlog`). If one is missing, a fail-closed dependent stops startup or the reload; any other is turned off and the conflict logged |
+
+| interfaces | |
+|-|-|
+| middleware | `plugin.RequestHook`, `AttemptHook`, `EventHook` (+ `EventHolder`), `ResponseHook` (edit or refuse a complete response before it is sent), `FinishHook`, `BodyMutator` |
+| other points | `Authenticator`, `Selector`, `Meter` (+ `QuotaHeaders`, `DeferredMeter` for batches), `Sink`, `Job`, `Admin` |
+| providers | `Provider` (+ `ModelLister`, `Refresher`, `QuotaProber`, `Sender`) |
+| lifecycle | `Initializer`, `Closer`; a Host implementing `plugin.NoticeHost` takes `Notify(plugin.Notice)` for [notifications](notifications.md) and never blocks |
+
+**Host and egress.** The Host gives a scoped logger, a plugin-scoped `KV`,
+global settings, a usage reader, the version and egress clients;
+`plugin.StateHost.State()` adds counters, slots and locks shared by all nodes,
+namespaced per plugin. A plugin never opens its own connections
+(`plugins/boundary_test.go`); it uses one of these, all with the SSRF guard and
+no redirects:
+
+| client | for | egress |
+|-|-|-|
+| `Outgoing.Client` | a provider's own calls during an attempt (token exchange in `Prepare`, a `Sender`'s request) | the credential's fixed proxy, the attempt's timers |
+| `Host.ClientFor(upstream, credential)` | upstream calls outside a request (`ListModels`, `Quota`, `Refresh`) | the credential's proxy, else the upstream's (from relay config, not the struct passed in); the upstream's timeouts |
+| `Host.HTTPClient` | traffic of no upstream; never for providers | direct |
+
+A configured proxy that is down fails the call, with no fallback to direct
+(hard rule 15). External plugins get the same from `host.http` with
+`upstream_id` / `credential_id`.
+
+| topic | what to know |
+|-|-|
+| ledger sinks | a sink with `FailPolicy: closed` has its own queue, so a slow one delays only itself. On a full queue the core waits, then writes from the finishing request; failed writes are retried with backoff, so skip a `Record.ID` already stored. Records undelivered at the shutdown deadline are logged as lost. Other sinks may drop records under load |
+| credential refresh | on a `refresh` verdict the core locks the credential cluster-wide, calls `Refresher`, stores the new secret and expiry, returns the credential to rotation and resends the attempt once. Without a `Refresher`, or if it fails, the credential sits out a minute. If the store keeps refusing the new secret, the request still uses it, the console flags the credential (still in rotation), `plugrelay_credential_secret_save_failures_total` counts it and the save is retried every minute; until it lands, restarting that node loses it (`internal/pipeline/refresh.go`) |
+| quota probe | `job.quotaprobe` (always on) calls `QuotaProber.Quota` for each credential of every enabled upstream, every upstream `quota_probe` or else the job's `interval` (10m), one node at a time, through `Host.ClientFor`. The result fills `Candidate.QuotaReset` for the `quota_reset` strategy and the credential's quota bar; `remaining` of 0 keeps the credential out until `reset_at`. Return `plugin.ErrNoQuota` if you cannot probe |
+| editing requests | implement `MutateBody` (patch tier, sjson on declared paths) and edit the IR from `Call.Request()` in `OnAttempt` (convert tier); see `plugins/middleware/parampolicy` |
+| notes | `Call.Note(text)` adds a line to the diagnostic of the attempt that answered (else the last); `OnFinish` is too late |
+| metrics | a built-in `prometheus.Collector` is served on `/metrics` while `sink.metrics` runs |
+| `Init` failures | the plugin is skipped and shown as `crashed`, with every plugin that requires it, fail-closed ones included (a skipped `meter.quota` enforces no budget). Check plugin status after deploys |
+| auth and `/native` | `/native` strips only the headers the core knows carry the platform key (`Authorization`, `x-api-key`, `x-goog-api-key`, `?key=`). An auth plugin reading the key from elsewhere must not be combined with `/native` grants, or the key reaches the upstream |
 
 ## Guardrails
 
-`middleware.guardrails` (`plugins/middleware/guardrails`, package doc) runs
-with `middleware.redact` while the content-safety feature is on (off by
-default). It checks requests and responses and
-applies one action to content rules.
+`middleware.guardrails` (`plugins/middleware/guardrails`, see its package doc)
+runs with `middleware.redact` while the content-safety feature is on (off by
+default). It checks requests and responses and applies one action to all
+content rules.
 
 | setting | merge | meaning |
 |-|-|-|
-| `detect` | union | detectors over request text and responses: `email`, `phone`, `credit_card` (Luhn), `iban` (mod 97), `cn_id` (18-digit resident ID, check digit and birth date), `us_ssn` (issued ranges only), `secret` (prefixed API keys, AWS ids, GitHub/Slack/Google/GitLab tokens, bearer tokens, JWTs), `private_key` (PEM) |
-| `deny_keywords`, `deny_patterns` | union | substrings, matched ignoring case, zero-width characters and full-width ASCII forms (other look-alikes are not folded); RE2 expressions, matched as written (an invalid one fails the request closed) |
+| `detect` | union | `email`, `phone`, `credit_card` (Luhn), `iban` (mod 97), `cn_id` (18-digit resident ID, check digit and birth date), `us_ssn` (issued ranges only), `secret` (prefixed API keys, AWS ids, GitHub/Slack/Google/GitLab tokens, bearer tokens, JWTs), `private_key` (PEM) |
+| `deny_keywords`, `deny_patterns` | union | substrings, ignoring case, zero-width characters and full-width ASCII (no other look-alikes); RE2 expressions as written (an invalid one fails the request closed) |
 | `action` | override | `block` (default), `redact` or `flag` |
 | `check_response` | override | also check responses (default on) |
 | `max_prompt_chars` | strictest | characters of system, messages, tool calls and results; `0` = unlimited |
-| `blocked_models`, `blocked_tools` | union | names or globs (`pkg/match`); tools are refused when offered or called in the history |
-| `stream_window` | override, global | bytes of streamed text kept for matching across chunks (2048, at most 16384) |
-| `block_unscannable_audio` | override | with `block` and any content rule or moderation on, refuse WebSocket audio input, which the rules cannot read (default off) |
-| `moderation_upstream`, `moderation_model`, `moderation_fail` | override, global/group | an upstream's OpenAI-compatible `/moderations` (path appended to its first endpoint's base URL, called with one of its credentials through the core egress); `closed` (default) refuses the request when the call fails, `open` lets it through and notes it |
-| `max_moderated_events` | strictest, global/group | Realtime client events of one session whose user text is sent to moderation (200); past them moderation counts as failed (`moderation_fail`) |
+| `blocked_models`, `blocked_tools` | union | names or globs (`pkg/match`); a tool is refused when offered or called in the history |
+| `stream_window` | override, global | bytes of streamed text kept to match across chunks (2048, max 16384) |
+| `block_unscannable_audio` | override | with `block` and any rule or moderation on, refuse WebSocket audio input, which rules cannot read (default off) |
+| `moderation_upstream`, `moderation_model`, `moderation_fail` | override, global/group | call an upstream's OpenAI-compatible `/moderations` (appended to its first endpoint's base URL, with one of its credentials, through the core egress); model default `omni-moderation-latest`; if the call fails, `closed` (default) refuses, `open` lets it through with a note |
+| `max_moderated_events` | strictest, global/group | Realtime client events per session whose user text is moderated (200); past that, moderation counts as failed |
 
-- What is read: on requests, all text the client supplies — system
-  prompts, every turn's text and thinking, tool calls' arguments and tool
-  results (not images or files); on responses, the model's text (not tool
-  input or thinking). Moderation gets the user turns' text only. Detectors
-  are conservative: numbers count only when their checksum or structure
-  holds (`plugins/internal/textscan`, shared with `middleware.redact`).
-- Not covered: `/native` passthrough runs no request hooks, so guardrails
-  (like every request plugin) never see it; keep it off for keys
-  guardrails must hold. Batches are checked request by request
-  ([clients](clients.md#batches)). WebSocket sessions are checked event by
-  event, text only: client events' text and output text deltas, never
-  audio ([clients](clients.md#realtime-and-websocket)).
-- `block`: the client gets its protocol's content-filter error (400 with
-  `content_filter` on OpenAI, `invalid_request_error` on Anthropic);
-  blocked models and tools get 403, an oversized prompt 400. A refused
-  complete response is not charged; its upstream cost is still recorded.
-- `redact`: matches become `[REDACTED:<rule>]` in the user turns' text of
-  the request (patch and convert tiers, like `middleware.redact`) and in
-  complete responses (re-encoded, even in passthrough). A match anywhere
-  else in the request (system prompt, other turns, tool calls and results)
-  is not edited: it is noted as `flag`. A stream cannot be redacted once bytes
-  are out, so there it is `flag`. A moderation hit has no span, so `redact`
-  blocks it.
-- Streams: text deltas are matched in a sliding window of `stream_window`
-  bytes. On `block`, frames whose text could still be part of a match are
-  held back and the stream stops with the protocol's error event as soon as
-  a match appears (a match at the newest byte that more text could undo,
-  such as a number that goes on, waits for that text or the block's end),
-  so no part of a match reaches the client: with keywords
-  only, just a tail that could start a keyword waits; with any pattern or
-  detector, text waits until it leaves the window, delaying the stream by up
-  to `stream_window` bytes. The guarantee covers matches no longer than the
-  window and within one content block (a block's end releases what is
-  held). On `flag` nothing waits, and a match still touching the newest byte
-  is noted once it is complete (or at the block's end).
-- Verdicts: an attempt diagnostic note `guardrails: <action> <phase>
-  <rules>` (phase `request`, `response`, `stream`) and
-  `plugrelay_guardrail_verdicts_total{phase,action,rule}`. A request refused
-  before any attempt has no attempt to note on; its log entry's error names
-  the rules.
+| topic | behaviour |
+|-|-|
+| what is read | requests: all client text — system prompts, each turn's text and thinking, tool call arguments and results (not images or files). Responses: model text (not tool input or thinking). Moderation sees user turns only. Detectors match only when a checksum or structure holds (`plugins/internal/textscan`, shared with `middleware.redact`) |
+| not covered | `/native` runs no request hooks, so keep it off for keys guardrails must hold. Batches are checked per request ([clients](clients.md#batches)); WebSocket sessions per event, text only ([clients](clients.md#realtime-and-websocket)) |
+| `block` | the protocol's content-filter error (400 `content_filter` on OpenAI, `invalid_request_error` on Anthropic); 403 for blocked models and tools, 400 for an oversized prompt. A refused complete response is not charged; its upstream cost is still recorded |
+| `redact` | matches become `[REDACTED:<rule>]` in the request's user-turn text (patch and convert tiers) and in complete responses (re-encoded, even in passthrough). Elsewhere in the request, and in streams, it acts as `flag`. A moderation hit has no span, so it is blocked |
+| streams | matched in a sliding window of `stream_window` bytes. On `block`, text that could still be part of a match is held and the stream ends with the protocol's error event once a match is certain, so no part of it reaches the client. Keywords alone hold only a tail that could start one; any pattern or detector delays output by up to `stream_window` bytes. Covered: matches no longer than the window inside one content block (a block's end releases what is held). On `flag` nothing is held |
+| verdicts | an attempt note `guardrails: <action> <phase> <rules>` (phase `request`, `response`, `stream`) and `plugrelay_guardrail_verdicts_total{phase,action,rule}`. A request refused before any attempt names the rules in its log entry's error |
 
 ## Call order and failure policy
 
-Same rules for every tier (`internal/pipeline`, `sdk/PROTOCOL.md`):
-
-1. Once per request: `auth`, `OnRequest`, selector `Rank`, `meter.Reserve`,
-   then `OnFinish` and `meter.Settle` or `meter.Refund`.
-2. Once per attempt, again on every retry: `OnAttempt`, then the provider's
-   `Prepare` / `Send` / `Classify`.
-3. Pre-hooks run in configured order, post-hooks in reverse; a post-hook runs
-   only for a plugin whose pre-hook ran.
-4. Any pre-hook may return a `Reply`; the chain and the upstream are skipped.
-5. `OnEvent` runs per streamed event, built-in only, within a 50 ms budget;
-   it may pass, drop, or abort (returning an `*ir.GwError` ends the stream
-   with that error). An `EventHolder` also says how many of its latest
-   events must not reach the client yet; they go out once released, or are
-   dropped when the stream is aborted. `OnResponse` runs once on a complete
-   response.
-6. On malfunction (crash, timeout, protocol error — `plugin.IsFailure`) the
-   plugin's `FailPolicy` decides: `closed` rejects the request, `open`
-   carries on. Defaults: closed for auth, meter and middleware; open for
-   sinks and jobs.
-7. `Settle` and `Refund` may be called again for the same request and must
-   apply once.
+Hook order, `Reply` short-circuits and `FailPolicy` defaults are the same for
+every tier: see [architecture](architecture.md#plugin-system-features-modules-extensions).
+Also: `OnAttempt` and the provider's `Prepare` / `Send` / `Classify` run again
+on every retry. `OnEvent` gets 50 ms per event and returns pass, drop or abort
+(an `*ir.GwError` ends the stream with it); an `EventHolder` also names how many
+of its latest events to hold back until released (dropped if the stream
+aborts). Only malfunctions (crash, timeout, protocol error — `plugin.IsFailure`)
+trigger `FailPolicy`; a deliberate `*ir.GwError` reaches the client as is.
+`Settle` and `Refund` may be called again and must apply once.
 
 ## Conformance suite: plugintest
 
-`pkg/plugin/plugintest` runs any `plugin.Provider` against a scripted upstream
-and checks the verdicts and header handling the core relies on: normal,
-stream, header ownership (a planted client secret must never reach the
-upstream), cut stream, 429 with retry-after, 401, suspended account
-(quarantine, no retry), content violation (no retry anywhere), uncertain
-(conservative), timeout before send, slow first byte, oversized SSE event,
-error passthrough, 5xx.
+`pkg/plugin/plugintest` runs a `plugin.Provider` against a scripted upstream
+and checks the verdicts and header handling the core relies on: normal, stream,
+header ownership (a planted client secret never reaches the upstream), cut
+stream, 429 with retry-after, 401, suspended account (quarantine, no retry),
+content violation (no retry anywhere), uncertain (conservative), timeout before
+send, slow first byte, oversized SSE event, error passthrough, 5xx.
 
 ```go
 func TestConformance(t *testing.T) {
@@ -482,14 +345,8 @@ func TestConformance(t *testing.T) {
 }
 ```
 
-A header `Prepare` sets must be listed in `OwnedHeaders`, unless `Prepare`
-only fills it when the client sent none (a protocol version default): the
-suite re-runs `Prepare` with a client value to tell the two apart.
-
-`UseSend: true` exercises a provider's own `Send`. `Skip` and `Expect` adapt
-scenarios that genuinely differ. Every endpoint of every file in `manifests/`
-runs the suite in `plugins/provider/compatible/conformance_test.go`, pointed
-at the fake upstream; Bedrock runs it through `Send` with event stream
-fixtures, Vertex against a fake token endpoint (`plugins/provider/internal/cloudtest`). External providers run through the host in
-`internal/extplugin/examples_test.go` (the echo provider passes the suite);
-there is no out-of-tree runner for non-Go plugins.
+| | |
+|-|-|
+| owned headers | a header `Prepare` sets must be in `OwnedHeaders`, unless `Prepare` fills it only when the client sent none (a protocol version default); the suite reruns `Prepare` with a client value to tell them apart |
+| options | `UseSend: true` tests the provider's own `Send`; `Skip` and `Expect` adjust scenarios that really differ |
+| in this repo | every endpoint of every `manifests/` file (`plugins/provider/compatible/conformance_test.go`); Bedrock through `Send` with event-stream fixtures and Vertex against a fake token endpoint (`plugins/provider/internal/cloudtest`); the echo provider through the host (`internal/extplugin/examples_test.go`). Non-Go plugins have no runner outside the repo |

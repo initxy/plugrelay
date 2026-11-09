@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 564" width="780" height="564" role="img" aria-label="One request through plugrelay">
+<title>One request through plugrelay</title>
+<style>
+  svg { font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Noto Sans CJK SC&quot;, &quot;Noto Sans SC&quot;, Helvetica, Arial, sans-serif; }
+  .bg { fill: #ffffff; }
+  .frame { fill: #f2f8f8; stroke: #0d7b84; stroke-width: 1.5; }
+  .box { fill: #ffffff; stroke: #c9d3d8; stroke-width: 1; }
+  .key { fill: #ffffff; stroke: #0d7b84; stroke-width: 1.5; }
+  .pill { fill: #f5f7f8; stroke: #c9d3d8; stroke-width: 1; }
+  .warn { fill: #fff7ec; stroke: #e0b26a; stroke-width: 1; }
+  .t { fill: #14212b; font-size: 14px; font-weight: 600; }
+  .s { fill: #56656f; font-size: 12px; }
+  .p { fill: #14212b; font-size: 13px; }
+  .lbl { fill: #56656f; font-size: 12px; }
+  .sec { fill: #56656f; font-size: 12px; font-weight: 600; letter-spacing: .04em; }
+  .brand { fill: #0d7b84; font-size: 15px; font-weight: 700; }
+  .num { fill: #ffffff; font-size: 12px; font-weight: 700; }
+  .dot { fill: #0d7b84; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.5px; fill: #0d7b84; }
+  .a { stroke: #0d7b84; stroke-width: 1.6; fill: none; }
+  .r { stroke: #7a8a94; stroke-width: 1.4; fill: none; stroke-dasharray: 4 3; }
+  .g { stroke: #9aa8b0; stroke-width: 1.2; fill: none; }
+  .life { stroke: #c9d3d8; stroke-width: 1; stroke-dasharray: 3 4; }
+  .ha { fill: #0d7b84; } .hr { fill: #7a8a94; } .hg { fill: #9aa8b0; }
+  @media (prefers-color-scheme: dark) {
+    .bg { fill: #0d1117; }
+    .frame { fill: #0f2226; stroke: #3fb8b0; }
+    .box, .key { fill: #161b22; }
+    .box, .pill { stroke: #30404a; }
+    .key { stroke: #3fb8b0; }
+    .pill { fill: #161b22; }
+    .warn { fill: #2a2112; stroke: #8a6a35; }
+    .t, .p { fill: #e6edf3; }
+    .s, .lbl, .sec { fill: #9aa7b2; }
+    .brand, .mono { fill: #5fd6cc; }
+    .dot, .ha { fill: #3fb8b0; }
+    .num { fill: #0d1117; }
+    .a { stroke: #3fb8b0; }
+    .r { stroke: #8b98a2; } .hr { fill: #8b98a2; }
+    .g { stroke: #5c6a74; } .hg { fill: #5c6a74; }
+    .life { stroke: #30404a; }
+  }
+</style>
+<defs>
+  <marker id="ma" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ha"/></marker>
+  <marker id="mr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="hr"/></marker>
+  <marker id="mg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="hg"/></marker>
+</defs>
+<rect width="780" height="564" rx="12" class="bg"/>
+<line x1="44" y1="40" x2="44" y2="494" class="life"/>
+<rect x="62.0" y="26.0" width="570.0" height="64.0" rx="8" class="box"/>
+<circle cx="44" cy="41" r="11" class="dot"/>
+<text x="44.0" y="45.0" class="num" text-anchor="middle">1</text>
+<text x="74.0" y="46.0" class="t" text-anchor="start">Read</text>
+<text x="74.0" y="64.0" class="s" text-anchor="start">sniff model, stream flag and session id; decode once into IR to learn what</text>
+<text x="74.0" y="81.0" class="s" text-anchor="start">it needs</text>
+<rect x="62.0" y="104.0" width="570.0" height="64.0" rx="8" class="box"/>
+<circle cx="44" cy="119" r="11" class="dot"/>
+<text x="44.0" y="123.0" class="num" text-anchor="middle">2</text>
+<text x="74.0" y="124.0" class="t" text-anchor="start">Request plugins</text>
+<text x="74.0" y="142.0" class="s" text-anchor="start">auth → OnRequest hooks in config order → meter reserves; any of them may</text>
+<text x="74.0" y="159.0" class="s" text-anchor="start">reply or reject</text>
+<rect x="62.0" y="182.0" width="570.0" height="64.0" rx="8" class="box"/>
+<circle cx="44" cy="197" r="11" class="dot"/>
+<text x="44.0" y="201.0" class="num" text-anchor="middle">3</text>
+<text x="74.0" y="202.0" class="t" text-anchor="start">Plan</text>
+<text x="74.0" y="220.0" class="s" text-anchor="start">router lists candidates by group, capability, stickiness and health;</text>
+<text x="74.0" y="237.0" class="s" text-anchor="start">selector may only reorder</text>
+<rect x="62.0" y="260.0" width="570.0" height="64.0" rx="8" class="key"/>
+<circle cx="44" cy="275" r="11" class="dot"/>
+<text x="44.0" y="279.0" class="num" text-anchor="middle">4</text>
+<text x="74.0" y="280.0" class="t" text-anchor="start">Attempt</text>
+<text x="74.0" y="298.0" class="s" text-anchor="start">OnAttempt → provider.Prepare → egress sends it as passthrough, patch or</text>
+<text x="74.0" y="315.0" class="s" text-anchor="start">convert</text>
+<rect x="62.0" y="402.0" width="570.0" height="64.0" rx="8" class="box"/>
+<circle cx="44" cy="417" r="11" class="dot"/>
+<text x="44.0" y="421.0" class="num" text-anchor="middle">5</text>
+<text x="74.0" y="422.0" class="t" text-anchor="start">Stream back</text>
+<text x="74.0" y="440.0" class="s" text-anchor="start">bytes go out as they arrive; a read-only decoder picks out usage, the</text>
+<text x="74.0" y="457.0" class="s" text-anchor="start">terminal event and private state</text>
+<rect x="62.0" y="480.0" width="570.0" height="64.0" rx="8" class="box"/>
+<circle cx="44" cy="495" r="11" class="dot"/>
+<text x="44.0" y="499.0" class="num" text-anchor="middle">6</text>
+<text x="74.0" y="500.0" class="t" text-anchor="start">Finish</text>
+<text x="74.0" y="518.0" class="s" text-anchor="start">cost every sent attempt, charge the delivered one, settle or refund once,</text>
+<text x="74.0" y="535.0" class="s" text-anchor="start">bind the session, OnFinish in reverse, queue the record</text>
+<rect x="104.0" y="338.0" width="500.0" height="50.0" rx="8" class="warn"/>
+<text x="118.0" y="358.0" class="p" text-anchor="start">failed, nothing sent to the client yet</text>
+<text x="118.0" y="376.0" class="s" text-anchor="start">provider.Classify → verdict → cooldown / quarantine / breaker</text>
+<path d="M144.0,325.0 L144.0,337.0" class="g" marker-end="url(#mg)"/>
+<path d="M605.0,363.0 L662.0,363.0 L662.0,292.0 L635.0,292.0" class="a" marker-end="url(#ma)"/>
+<text x="670.0" y="325.5" class="lbl" text-anchor="start">next candidate</text>
+<text x="670.0" y="341.5" class="lbl" text-anchor="start">(up to 4 attempts)</text>
+</svg>

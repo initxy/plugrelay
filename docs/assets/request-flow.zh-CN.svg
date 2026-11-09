@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 479" width="780" height="479" role="img" aria-label="一次请求在 plugrelay 里怎么走">
+<title>一次请求在 plugrelay 里怎么走</title>
+<style>
+  svg { font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Noto Sans CJK SC&quot;, &quot;Noto Sans SC&quot;, Helvetica, Arial, sans-serif; }
+  .bg { fill: #ffffff; }
+  .frame { fill: #f2f8f8; stroke: #0d7b84; stroke-width: 1.5; }
+  .box { fill: #ffffff; stroke: #c9d3d8; stroke-width: 1; }
+  .key { fill: #ffffff; stroke: #0d7b84; stroke-width: 1.5; }
+  .pill { fill: #f5f7f8; stroke: #c9d3d8; stroke-width: 1; }
+  .warn { fill: #fff7ec; stroke: #e0b26a; stroke-width: 1; }
+  .t { fill: #14212b; font-size: 14px; font-weight: 600; }
+  .s { fill: #56656f; font-size: 12px; }
+  .p { fill: #14212b; font-size: 13px; }
+  .lbl { fill: #56656f; font-size: 12px; }
+  .sec { fill: #56656f; font-size: 12px; font-weight: 600; letter-spacing: .04em; }
+  .brand { fill: #0d7b84; font-size: 15px; font-weight: 700; }
+  .num { fill: #ffffff; font-size: 12px; font-weight: 700; }
+  .dot { fill: #0d7b84; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.5px; fill: #0d7b84; }
+  .a { stroke: #0d7b84; stroke-width: 1.6; fill: none; }
+  .r { stroke: #7a8a94; stroke-width: 1.4; fill: none; stroke-dasharray: 4 3; }
+  .g { stroke: #9aa8b0; stroke-width: 1.2; fill: none; }
+  .life { stroke: #c9d3d8; stroke-width: 1; stroke-dasharray: 3 4; }
+  .ha { fill: #0d7b84; } .hr { fill: #7a8a94; } .hg { fill: #9aa8b0; }
+  @media (prefers-color-scheme: dark) {
+    .bg { fill: #0d1117; }
+    .frame { fill: #0f2226; stroke: #3fb8b0; }
+    .box, .key { fill: #161b22; }
+    .box, .pill { stroke: #30404a; }
+    .key { stroke: #3fb8b0; }
+    .pill { fill: #161b22; }
+    .warn { fill: #2a2112; stroke: #8a6a35; }
+    .t, .p { fill: #e6edf3; }
+    .s, .lbl, .sec { fill: #9aa7b2; }
+    .brand, .mono { fill: #5fd6cc; }
+    .dot, .ha { fill: #3fb8b0; }
+    .num { fill: #0d1117; }
+    .a { stroke: #3fb8b0; }
+    .r { stroke: #8b98a2; } .hr { fill: #8b98a2; }
+    .g { stroke: #5c6a74; } .hg { fill: #5c6a74; }
+    .life { stroke: #30404a; }
+  }
+</style>
+<defs>
+  <marker id="ma" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ha"/></marker>
+  <marker id="mr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="hr"/></marker>
+  <marker id="mg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="hg"/></marker>
+</defs>
+<rect width="780" height="479" rx="12" class="bg"/>
+<line x1="44" y1="40" x2="44" y2="409" class="life"/>
+<rect x="62.0" y="26.0" width="570.0" height="47.0" rx="8" class="box"/>
+<circle cx="44" cy="41" r="11" class="dot"/>
+<text x="44.0" y="45.0" class="num" text-anchor="middle">1</text>
+<text x="74.0" y="46.0" class="t" text-anchor="start">读请求</text>
+<text x="74.0" y="64.0" class="s" text-anchor="start">嗅出模型、是否流式、会话 id；解码一次，得到这个请求要用哪些能力</text>
+<rect x="62.0" y="87.0" width="570.0" height="47.0" rx="8" class="box"/>
+<circle cx="44" cy="102" r="11" class="dot"/>
+<text x="44.0" y="106.0" class="num" text-anchor="middle">2</text>
+<text x="74.0" y="107.0" class="t" text-anchor="start">前置插件</text>
+<text x="74.0" y="125.0" class="s" text-anchor="start">鉴权 → 按配置顺序跑 OnRequest → meter 预扣费；任何一步都可以直接回复或拒绝</text>
+<rect x="62.0" y="148.0" width="570.0" height="47.0" rx="8" class="box"/>
+<circle cx="44" cy="163" r="11" class="dot"/>
+<text x="44.0" y="167.0" class="num" text-anchor="middle">3</text>
+<text x="74.0" y="168.0" class="t" text-anchor="start">排候选</text>
+<text x="74.0" y="186.0" class="s" text-anchor="start">router 按分组、能力、粘性、健康状态排出候选；selector 只能调顺序，不能加</text>
+<rect x="62.0" y="209.0" width="570.0" height="47.0" rx="8" class="key"/>
+<circle cx="44" cy="224" r="11" class="dot"/>
+<text x="44.0" y="228.0" class="num" text-anchor="middle">4</text>
+<text x="74.0" y="229.0" class="t" text-anchor="start">尝试</text>
+<text x="74.0" y="247.0" class="s" text-anchor="start">OnAttempt → provider.Prepare → 出站层按透传、改字段或转换发出去</text>
+<rect x="62.0" y="334.0" width="570.0" height="47.0" rx="8" class="box"/>
+<circle cx="44" cy="349" r="11" class="dot"/>
+<text x="44.0" y="353.0" class="num" text-anchor="middle">5</text>
+<text x="74.0" y="354.0" class="t" text-anchor="start">流回客户端</text>
+<text x="74.0" y="372.0" class="s" text-anchor="start">字节边到边转发；只读解码器顺带取出用量、结束事件和私有状态</text>
+<rect x="62.0" y="395.0" width="570.0" height="64.0" rx="8" class="box"/>
+<circle cx="44" cy="410" r="11" class="dot"/>
+<text x="44.0" y="414.0" class="num" text-anchor="middle">6</text>
+<text x="74.0" y="415.0" class="t" text-anchor="start">收尾</text>
+<text x="74.0" y="433.0" class="s" text-anchor="start">发出去的每次尝试都记成本，只对送达的那次收费；结算或退款一次；绑定会话；OnFinish 倒</text>
+<text x="74.0" y="450.0" class="s" text-anchor="start">序；日志异步入队</text>
+<rect x="104.0" y="270.0" width="500.0" height="50.0" rx="8" class="warn"/>
+<text x="118.0" y="290.0" class="p" text-anchor="start">失败，且还没给客户端发内容</text>
+<text x="118.0" y="308.0" class="s" text-anchor="start">provider.Classify 给出判定 → 冷却 / 隔离 / 熔断</text>
+<path d="M144.0,257.0 L144.0,269.0" class="g" marker-end="url(#mg)"/>
+<path d="M605.0,295.0 L662.0,295.0 L662.0,232.5 L635.0,232.5" class="a" marker-end="url(#ma)"/>
+<text x="670.0" y="261.8" class="lbl" text-anchor="start">换下一个候选</text>
+<text x="670.0" y="277.8" class="lbl" text-anchor="start">（最多 4 次）</text>
+</svg>

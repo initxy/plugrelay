@@ -1,0 +1,147 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 540" width="920" height="540" role="img" aria-label="plugrelay architecture overview">
+<title>plugrelay architecture overview</title>
+<style>
+  svg { font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Noto Sans CJK SC&quot;, &quot;Noto Sans SC&quot;, Helvetica, Arial, sans-serif; }
+  .bg { fill: #ffffff; }
+  .frame { fill: #f2f8f8; stroke: #0d7b84; stroke-width: 1.5; }
+  .box { fill: #ffffff; stroke: #c9d3d8; stroke-width: 1; }
+  .key { fill: #ffffff; stroke: #0d7b84; stroke-width: 1.5; }
+  .pill { fill: #f5f7f8; stroke: #c9d3d8; stroke-width: 1; }
+  .warn { fill: #fff7ec; stroke: #e0b26a; stroke-width: 1; }
+  .t { fill: #14212b; font-size: 14px; font-weight: 600; }
+  .s { fill: #56656f; font-size: 12px; }
+  .p { fill: #14212b; font-size: 13px; }
+  .lbl { fill: #56656f; font-size: 12px; }
+  .sec { fill: #56656f; font-size: 12px; font-weight: 600; letter-spacing: .04em; }
+  .brand { fill: #0d7b84; font-size: 15px; font-weight: 700; }
+  .num { fill: #ffffff; font-size: 12px; font-weight: 700; }
+  .dot { fill: #0d7b84; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.5px; fill: #0d7b84; }
+  .a { stroke: #0d7b84; stroke-width: 1.6; fill: none; }
+  .r { stroke: #7a8a94; stroke-width: 1.4; fill: none; stroke-dasharray: 4 3; }
+  .g { stroke: #9aa8b0; stroke-width: 1.2; fill: none; }
+  .life { stroke: #c9d3d8; stroke-width: 1; stroke-dasharray: 3 4; }
+  .ha { fill: #0d7b84; } .hr { fill: #7a8a94; } .hg { fill: #9aa8b0; }
+  @media (prefers-color-scheme: dark) {
+    .bg { fill: #0d1117; }
+    .frame { fill: #0f2226; stroke: #3fb8b0; }
+    .box, .key { fill: #161b22; }
+    .box, .pill { stroke: #30404a; }
+    .key { stroke: #3fb8b0; }
+    .pill { fill: #161b22; }
+    .warn { fill: #2a2112; stroke: #8a6a35; }
+    .t, .p { fill: #e6edf3; }
+    .s, .lbl, .sec { fill: #9aa7b2; }
+    .brand, .mono { fill: #5fd6cc; }
+    .dot, .ha { fill: #3fb8b0; }
+    .num { fill: #0d1117; }
+    .a { stroke: #3fb8b0; }
+    .r { stroke: #8b98a2; } .hr { fill: #8b98a2; }
+    .g { stroke: #5c6a74; } .hg { fill: #5c6a74; }
+    .life { stroke: #30404a; }
+  }
+</style>
+<defs>
+  <marker id="ma" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ha"/></marker>
+  <marker id="mr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="hr"/></marker>
+  <marker id="mg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="hg"/></marker>
+</defs>
+<rect width="920" height="540" rx="12" class="bg"/>
+<text x="20.0" y="28.0" class="sec" text-anchor="start">CLIENTS</text>
+<text x="90.0" y="28.0" class="lbl" text-anchor="start">change the base URL and key, nothing else</text>
+<rect x="20.0" y="38.0" width="136.7" height="32.0" rx="16" class="pill"/>
+<text x="88.3" y="59.0" class="p" text-anchor="middle">Claude Code</text>
+<line x1="88.3" y1="70" x2="88.3" y2="80" class="g"/>
+<rect x="168.7" y="38.0" width="136.7" height="32.0" rx="16" class="pill"/>
+<text x="237.0" y="59.0" class="p" text-anchor="middle">Codex</text>
+<line x1="237.0" y1="70" x2="237.0" y2="80" class="g"/>
+<rect x="317.3" y="38.0" width="136.7" height="32.0" rx="16" class="pill"/>
+<text x="385.7" y="59.0" class="p" text-anchor="middle">Gemini CLI</text>
+<line x1="385.7" y1="70" x2="385.7" y2="80" class="g"/>
+<rect x="466.0" y="38.0" width="136.7" height="32.0" rx="16" class="pill"/>
+<text x="534.3" y="59.0" class="p" text-anchor="middle">Cursor</text>
+<line x1="534.3" y1="70" x2="534.3" y2="80" class="g"/>
+<rect x="614.7" y="38.0" width="136.7" height="32.0" rx="16" class="pill"/>
+<text x="683.0" y="59.0" class="p" text-anchor="middle">Cline</text>
+<line x1="683.0" y1="70" x2="683.0" y2="80" class="g"/>
+<rect x="763.3" y="38.0" width="136.7" height="32.0" rx="16" class="pill"/>
+<text x="831.7" y="59.0" class="p" text-anchor="middle">OpenCode</text>
+<line x1="831.7" y1="70" x2="831.7" y2="80" class="g"/>
+<line x1="88.3" y1="80" x2="831.7" y2="80" class="g"/>
+<rect x="20.0" y="92.0" width="880.0" height="316.0" rx="14" class="frame"/>
+<text x="884.0" y="114.0" class="brand" text-anchor="end">plugrelay</text>
+<rect x="40.0" y="126.0" width="145.6" height="84.0" rx="8" class="key"/>
+<text x="112.8" y="154.0" class="t" text-anchor="middle">Decode</text>
+<text x="112.8" y="174.0" class="s" text-anchor="middle">which protocol,</text>
+<text x="112.8" y="191.0" class="s" text-anchor="middle">what the request needs</text>
+<rect x="213.6" y="126.0" width="145.6" height="84.0" rx="8" class="key"/>
+<text x="286.4" y="154.0" class="t" text-anchor="middle">Plugins</text>
+<text x="286.4" y="174.0" class="s" text-anchor="middle">auth · limits</text>
+<text x="286.4" y="191.0" class="s" text-anchor="middle">safety · reserve</text>
+<rect x="387.2" y="126.0" width="145.6" height="84.0" rx="8" class="key"/>
+<text x="460.0" y="154.0" class="t" text-anchor="middle">Route</text>
+<text x="460.0" y="174.0" class="s" text-anchor="middle">capabilities · sticky</text>
+<text x="460.0" y="191.0" class="s" text-anchor="middle">cooldown · breaker</text>
+<rect x="560.8" y="126.0" width="145.6" height="84.0" rx="8" class="key"/>
+<text x="633.6" y="154.0" class="t" text-anchor="middle">Send</text>
+<text x="633.6" y="174.0" class="s" text-anchor="middle">passthrough · patch</text>
+<text x="633.6" y="191.0" class="s" text-anchor="middle">convert</text>
+<rect x="734.4" y="126.0" width="145.6" height="84.0" rx="8" class="key"/>
+<text x="807.2" y="154.0" class="t" text-anchor="middle">Egress</text>
+<text x="807.2" y="174.0" class="s" text-anchor="middle">fixed proxy · SSRF</text>
+<text x="807.2" y="191.0" class="s" text-anchor="middle">timeouts</text>
+<path d="M188.6,156.0 L210.6,156.0" class="a" marker-end="url(#ma)"/>
+<path d="M210.6,180.0 L188.6,180.0" class="r" marker-end="url(#mr)"/>
+<path d="M362.2,156.0 L384.2,156.0" class="a" marker-end="url(#ma)"/>
+<path d="M384.2,180.0 L362.2,180.0" class="r" marker-end="url(#mr)"/>
+<path d="M535.8,156.0 L557.8,156.0" class="a" marker-end="url(#ma)"/>
+<path d="M557.8,180.0 L535.8,180.0" class="r" marker-end="url(#mr)"/>
+<path d="M709.4,156.0 L731.4,156.0" class="a" marker-end="url(#ma)"/>
+<path d="M731.4,180.0 L709.4,180.0" class="r" marker-end="url(#mr)"/>
+<path d="M104.8,80.0 L104.8,124.0" class="a" marker-end="url(#ma)"/>
+<path d="M120.8,124.0 L120.8,80.0" class="r" marker-end="url(#mr)"/>
+<rect x="40.0" y="300.0" width="124.0" height="76.0" rx="8" class="box"/>
+<text x="102.0" y="333.0" class="t" text-anchor="middle">Console</text>
+<text x="102.0" y="353.0" class="s" text-anchor="middle">admin API</text>
+<rect x="214.0" y="300.0" width="180.0" height="76.0" rx="8" class="box"/>
+<text x="304.0" y="333.0" class="t" text-anchor="middle">Business data</text>
+<text x="304.0" y="353.0" class="s" text-anchor="middle">SQLite · Postgres · MySQL</text>
+<rect x="414.0" y="300.0" width="150.0" height="76.0" rx="8" class="box"/>
+<text x="489.0" y="333.0" class="t" text-anchor="middle">Runtime state</text>
+<text x="489.0" y="353.0" class="s" text-anchor="middle">memory · SQL · Redis</text>
+<rect x="590.0" y="300.0" width="170.0" height="76.0" rx="8" class="box"/>
+<text x="675.0" y="333.0" class="t" text-anchor="middle">Upstream plugins</text>
+<text x="675.0" y="353.0" class="s" text-anchor="middle">manifest · process · Go</text>
+<path d="M166.0,338.0 L212.0,338.0" class="g" marker-end="url(#mg)"/>
+<text x="189.0" y="331.0" class="lbl" text-anchor="middle">writes</text>
+<path d="M296.4,298.0 L296.4,212.0" class="g" marker-end="url(#mg)"/>
+<text x="304.4" y="259.0" class="lbl" text-anchor="start">read-only snapshot</text>
+<path d="M470.0,298.0 L470.0,212.0" class="g" marker-end="url(#mg)"/>
+<text x="478.0" y="259.0" class="lbl" text-anchor="start">health</text>
+<path d="M633.6,298.0 L633.6,212.0" class="g" marker-end="url(#mg)"/>
+<text x="641.6" y="259.0" class="lbl" text-anchor="start">auth, errors</text>
+<path d="M799.2,212.0 L799.2,432.0" class="a" marker-end="url(#ma)"/>
+<path d="M815.2,432.0 L815.2,212.0" class="r" marker-end="url(#mr)"/>
+<rect x="20.0" y="444.0" width="166.4" height="32.0" rx="16" class="pill"/>
+<text x="103.2" y="465.0" class="p" text-anchor="middle">Vendor APIs</text>
+<line x1="103.2" y1="434" x2="103.2" y2="444" class="g"/>
+<rect x="198.4" y="444.0" width="166.4" height="32.0" rx="16" class="pill"/>
+<text x="281.6" y="465.0" class="p" text-anchor="middle">Clouds</text>
+<line x1="281.6" y1="434" x2="281.6" y2="444" class="g"/>
+<rect x="376.8" y="444.0" width="166.4" height="32.0" rx="16" class="pill"/>
+<text x="460.0" y="465.0" class="p" text-anchor="middle">Inference hosts</text>
+<line x1="460.0" y1="434" x2="460.0" y2="444" class="g"/>
+<rect x="555.2" y="444.0" width="166.4" height="32.0" rx="16" class="pill"/>
+<text x="638.4" y="465.0" class="p" text-anchor="middle">Gateways</text>
+<line x1="638.4" y1="434" x2="638.4" y2="444" class="g"/>
+<rect x="733.6" y="444.0" width="166.4" height="32.0" rx="16" class="pill"/>
+<text x="816.8" y="465.0" class="p" text-anchor="middle">Self-hosted</text>
+<line x1="816.8" y1="434" x2="816.8" y2="444" class="g"/>
+<line x1="103.2" y1="434" x2="816.8" y2="434" class="g"/>
+<text x="20.0" y="500.0" class="sec" text-anchor="start">UPSTREAMS</text>
+<text x="110.0" y="500.0" class="lbl" text-anchor="start">108 ready-made manifests; private protocols via external plugins</text>
+<text x="490.4" y="520.0" class="lbl" text-anchor="start">streamed back as it arrives: usage, terminal event, sealed state</text>
+<path d="M456.4,516.0 L482.4,516.0" class="r" marker-end="url(#mr)"/>
+<text x="389.6" y="520.0" class="lbl" text-anchor="start">request</text>
+<path d="M355.6,516.0 L381.6,516.0" class="a" marker-end="url(#ma)"/>
+</svg>
