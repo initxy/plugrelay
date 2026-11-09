@@ -1,0 +1,27 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://friendli.ai/docs/guides/model-apis/quickstart
+#   https://friendli.ai/docs/openapi/model-apis/chat-completions
+id: friendli
+kind: provider
+name: FriendliAI (Model APIs)
+name_zh: "FriendliAI（模型 API）"
+category: inference
+homepage: https://friendli.ai/docs
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+# Selects the team whose quota is billed: only the credential's value
+# (meta key "team") goes out.
+owned_headers: [X-Friendli-Team]
+credential_headers:
+  X-Friendli-Team: team
+capabilities:
+  cache: none
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api.friendli.ai/serverless/v1
+    capabilities:
+      freeform_tools: false

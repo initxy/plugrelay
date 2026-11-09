@@ -1,0 +1,38 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://github.com/mlc-ai/mlc-llm/blob/main/docs/deploy/rest.rst
+#   https://github.com/mlc-ai/mlc-llm/blob/main/python/mlc_llm/protocol/openai_api_protocol.py
+# mlc_llm serve.
+id: mlc-llm
+kind: provider
+name: MLC LLM
+category: self_hosted
+homepage: https://llm.mlc.ai
+interpreter: openai-compatible
+variables:
+  base_url:
+    default: http://localhost:8000/v1
+    description: OpenAI-compatible base URL of the server, including /v1.
+    description_zh: "服务的 OpenAI 兼容地址，带 /v1。"
+# Runs without a key unless started with --api-key; an empty credential
+# secret sends no Authorization header.
+auth:
+  key_optional: true
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: "{base_url}"
+    capabilities:
+      freeform_tools: false
+  - id: completions
+    protocol: openai-completions
+    base_url: "{base_url}"
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: "{base_url}"
+models:
+  list: /models

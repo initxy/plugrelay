@@ -1,0 +1,35 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.cloud.google.com/vertex-ai/generative-ai/docs/reference/rest
+#   https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/capabilities/get-token-count
+id: vertex-gemini
+kind: provider
+name: Google Vertex AI (Gemini models)
+name_zh: "Google Vertex AI（Gemini 模型）"
+category: cloud
+homepage: https://cloud.google.com/vertex-ai/generative-ai/docs/reference/rest
+# provider.vertex turns the service account key into access tokens and
+# moves the Gemini API path under the project's publisher path.
+interpreter: vertex
+variables:
+  project:
+    description: Google Cloud project id; defaults to project_id of the service account key.
+    description_zh: "Google Cloud 项目 ID；不填就用服务账号密钥里的 project_id。"
+  location:
+    default: global
+    description: Vertex AI location (global, us-central1, europe-west4, …).
+    description_zh: "Vertex AI 的区域（global、us-central1、europe-west4 等）。"
+auth:
+  header: Authorization
+  scheme: Bearer
+owned_headers: [X-Goog-User-Project]
+capabilities:
+  cache: implicit
+endpoints:
+  - protocol: gemini
+    base_url: https://{location}-aiplatform.googleapis.com
+    # Kept apart from the Gemini API's thought signatures: accepting each
+    # other's is not documented.
+    issuer: vertex-gemini
+errors:
+  - when: {status: 403, message_contains: "has been suspended"}
+    verdict: {cause: banned, signal: permission}

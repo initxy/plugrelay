@@ -1,0 +1,69 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope
+#   https://help.aliyun.com/zh/model-studio/anthropic-api-messages
+#   https://help.aliyun.com/zh/model-studio/compatibility-with-openai-responses-api
+#   https://help.aliyun.com/zh/model-studio/context-cache
+#   https://help.aliyun.com/zh/model-studio/error-code
+#   https://help.aliyun.com/zh/model-studio/embedding
+# Keys are bound to a region. The docs lead with per-workspace hosts
+# ({WorkspaceId}.{region}.maas.aliyuncs.com); the dashscope hosts below
+# work as well and can be overridden through host.
+id: qwen-dashscope
+kind: provider
+name: Alibaba Cloud Model Studio (Qwen, DashScope)
+name_zh: "阿里云百炼（通义千问）"
+category: cloud
+homepage: https://help.aliyun.com/zh/model-studio/
+variables:
+  host:
+    default: dashscope.aliyuncs.com
+    description: API host; dashscope-intl.aliyuncs.com for Singapore, or a workspace host.
+    description_zh: "API 域名；新加坡填 dashscope-intl.aliyuncs.com，也可以填工作空间域名。"
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://{host}/compatible-mode/v1
+    interpreter: openai-compatible
+    capabilities:
+      freeform_tools: false
+      reasoning: reasoning_content
+  - id: responses
+    protocol: openai-responses
+    base_url: https://{host}/compatible-mode/v1
+    interpreter: openai-compatible
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  # Explicit cache_control breakpoints are honoured (5-minute TTL).
+  - protocol: anthropic
+    base_url: https://{host}/apps/anthropic
+    interpreter: anthropic-compatible
+    capabilities:
+      cache: explicit
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+  # text-embedding-v4 and qwen3.7-text-embedding; dimensions is honoured.
+  # /images/generations is served only on workspace hosts (the dashscope
+  # host answers 404), so it is not declared; there is no OpenAI audio
+  # route.
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: https://{host}/compatible-mode/v1
+    interpreter: openai-compatible
+errors:
+  # Overdue accounts answer 403, which would otherwise quarantine the key.
+  - when: {code: Arrearage}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  # The model's free tier is used up; other models still work.
+  - when: {code: AllocationQuota.FreeTierOnly}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, model_scope: true, signal: quota_exhausted}

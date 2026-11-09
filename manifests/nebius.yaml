@@ -1,0 +1,51 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.tokenfactory.nebius.com/api-reference/introduction
+#   https://docs.tokenfactory.nebius.com/cached-tokens
+#   https://api.tokenfactory.nebius.com/openapi.json
+#   https://docs.tokenfactory.nebius.com/api-reference/examples/image-generation.md
+# Nebius AI Studio was renamed Token Factory.
+id: nebius
+kind: provider
+name: Nebius Token Factory
+category: inference
+homepage: https://docs.tokenfactory.nebius.com
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api.tokenfactory.nebius.com/v1
+    capabilities:
+      freeform_tools: false
+      max_tokens_field: max_tokens
+  - id: responses
+    protocol: openai-responses
+    base_url: https://api.tokenfactory.nebius.com/v1
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  - id: completions
+    protocol: openai-completions
+    base_url: https://api.tokenfactory.nebius.com/v1
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: https://api.tokenfactory.nebius.com/v1
+  # Generations only.
+  - id: images
+    protocol: openai-images
+    base_url: https://api.tokenfactory.nebius.com/v1
+    capabilities:
+      image_edit: false
+  # /v1/rerank in openapi.json (vLLM's shape); the schema lists neither
+  # top_n nor return_documents.
+  - protocol: rerank
+    base_url: https://api.tokenfactory.nebius.com/v1
+models:
+  list: /models

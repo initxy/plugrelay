@@ -1,0 +1,49 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://ppio.com/docs/model/get-start
+#   https://ppio.com/docs/model/llm-anthropic-compatibility
+#   https://ppio.com/docs/models/reference-error-code
+#   https://ppio.com/docs/model/llm-prompt-cache
+id: ppio
+kind: provider
+name: PPIO
+name_zh: "PPIO 派欧云"
+category: inference
+homepage: https://ppio.com/docs
+variables:
+  host:
+    default: api.ppio.com
+    description: API host; api.ppinfra.com is suggested for mainland China.
+    description_zh: "API 域名；中国大陆建议填 api.ppinfra.com。"
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://{host}/openai/v1
+    interpreter: openai-compatible
+    capabilities:
+      freeform_tools: false
+      reasoning: reasoning_content
+  # No suffix parameter.
+  - id: completions
+    protocol: openai-completions
+    base_url: https://{host}/openai/v1
+    interpreter: openai-compatible
+  - protocol: anthropic
+    base_url: https://{host}/anthropic
+    interpreter: anthropic-compatible
+    capabilities:
+      cache: none
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+errors:
+  # Out of balance arrives as 403, which would otherwise quarantine the key.
+  - when: {code: NOT_ENOUGH_BALANCE}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+models:
+  list: /models

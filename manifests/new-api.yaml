@@ -1,0 +1,64 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://raw.githubusercontent.com/QuantumNous/new-api/main/README.en.md
+#   https://raw.githubusercontent.com/QuantumNous/new-api/main/router/relay-router.go
+#   https://raw.githubusercontent.com/QuantumNous/new-api/main/middleware/auth.go
+#   https://raw.githubusercontent.com/QuantumNous/new-api/main/relay/common_handler/rerank.go
+# A New API site used as an upstream; the credential secret is a token the
+# site issued. Its Gemini-native routes are not declared: their error
+# bodies depend on the channel behind the site.
+id: new-api
+kind: provider
+name: New API
+category: gateway
+homepage: https://github.com/QuantumNous/new-api
+interpreter: openai-compatible
+variables:
+  server_url:
+    default: http://localhost:3000
+    description: Root URL of the site, without /v1.
+    description_zh: "站点的根地址，不带 /v1。"
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: "{server_url}/v1"
+    capabilities:
+      freeform_tools: false
+  - id: responses
+    protocol: openai-responses
+    base_url: "{server_url}/v1"
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  - id: completions
+    protocol: openai-completions
+    base_url: "{server_url}/v1"
+  # count_tokens is disabled.
+  - protocol: anthropic
+    base_url: "{server_url}"
+    interpreter: anthropic-compatible
+    capabilities:
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: "{server_url}/v1"
+  - id: images
+    protocol: openai-images
+    base_url: "{server_url}/v1"
+  - id: audio
+    protocol: openai-audio
+    base_url: "{server_url}/v1"
+  # Jina-shaped, whatever channel serves the model.
+  - protocol: rerank
+    base_url: "{server_url}/v1"
+models:
+  list: /models

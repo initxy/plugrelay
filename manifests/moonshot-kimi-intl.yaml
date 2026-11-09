@@ -1,0 +1,54 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://platform.kimi.ai/docs/api/overview
+#   https://platform.kimi.ai/docs/api/chat
+#   https://platform.kimi.ai/docs/api/messages
+#   https://platform.kimi.ai/docs/api/errors
+# The international platform (platform.kimi.ai): its keys work only on
+# api.moonshot.ai. The China platform is moonshot-kimi.
+id: moonshot-kimi-intl
+kind: provider
+name: Moonshot AI (Kimi, international)
+name_zh: "月之暗面 Kimi（国际版）"
+category: vendor
+homepage: https://platform.kimi.ai/docs
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api.moonshot.ai/v1
+    capabilities:
+      freeform_tools: false
+      max_tokens_field: max_completion_tokens
+      reasoning: reasoning_content
+  - id: responses
+    protocol: openai-responses
+    base_url: https://api.moonshot.ai/v1
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  - protocol: anthropic
+    base_url: https://api.moonshot.ai/anthropic
+    interpreter: anthropic-compatible
+    capabilities:
+      # cache_control is honoured only at the top level, not inside message
+      # content, so breakpoints are not relied on.
+      cache: implicit
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+errors:
+  # Exhausted balance arrives as 429 with this type.
+  - when: {code: exceeded_current_quota_error}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: content_filter}
+    verdict: {cause: content, signal: content_filtered}
+models:
+  list: /models

@@ -1,0 +1,34 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.parasail.io/api-reference/chat-completions
+#   https://docs.parasail.io/api-reference/responses-api
+#   https://docs.parasail.io/api-reference/models-endpoint
+id: parasail
+kind: provider
+name: Parasail
+category: inference
+homepage: https://docs.parasail.io
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api.parasail.io/v1
+    capabilities:
+      freeform_tools: false
+      max_tokens_field: max_tokens
+  # Serverless only; store must be false, no previous_response_id.
+  - id: responses
+    protocol: openai-responses
+    base_url: https://api.parasail.io/v1
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+models:
+  list: /models

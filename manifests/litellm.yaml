@@ -1,0 +1,52 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.litellm.ai/docs/simple_proxy
+#   https://docs.litellm.ai/docs/supported_endpoints
+#   https://docs.litellm.ai/docs/proxy/users
+id: litellm
+kind: provider
+name: LiteLLM Proxy
+name_zh: "LiteLLM 代理"
+category: gateway
+homepage: https://docs.litellm.ai/docs/simple_proxy
+interpreter: openai-compatible
+variables:
+  server_url:
+    default: http://localhost:4000
+    description: Root URL of the proxy, without /v1.
+    description_zh: "代理的根地址，不带 /v1。"
+# A proxy without a master key accepts any key; an empty credential secret
+# sends no Authorization header.
+auth:
+  key_optional: true
+  header: Authorization
+  scheme: Bearer
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: "{server_url}"
+    capabilities:
+      freeform_tools: false
+  - id: responses
+    protocol: openai-responses
+    base_url: "{server_url}"
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  - id: completions
+    protocol: openai-completions
+    base_url: "{server_url}"
+  - protocol: anthropic
+    base_url: "{server_url}"
+    interpreter: anthropic-compatible
+    capabilities:
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+errors:
+  # Key, user, team or end-user budget spent; the body's status varies
+  # (400, 429), the type does not.
+  - when: {code: budget_exceeded}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}

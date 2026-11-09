@@ -1,0 +1,43 @@
+{
+  "model": "gpt-test",
+  "messages": [
+    {"role": "system", "content": "You are terse."},
+    {"role": "developer", "content": [{"type": "text", "text": "Rule A."}, {"type": "text", "text": "Rule B.", "cache_control": {"type": "ephemeral"}}]},
+    {"role": "user", "name": "alice", "content": [
+      {"type": "text", "text": "What is in this image? <b>&</b>"},
+      {"type": "image_url", "image_url": {"url": "data:image/png;base64,iVBORw0KGgo=", "detail": "high"}},
+      {"type": "image_url", "image_url": {"url": "https://example.com/cat.jpg"}},
+      {"type": "input_audio", "input_audio": {"data": "AAAA", "format": "wav"}}
+    ]},
+    {"role": "assistant", "content": null, "reasoning_content": "Need weather for both.", "tool_calls": [
+      {"id": "call_1", "type": "function", "function": {"name": "get_weather", "arguments": "{\"city\":\"Paris\"}"}},
+      {"id": "call_2", "type": "function", "function": {"name": "get_weather", "arguments": "{\"city\":\"Tokyo\"}"}},
+      {"id": "call_3", "type": "custom", "custom": {"name": "apply_patch", "input": "*** Begin Patch"}}
+    ]},
+    {"role": "tool", "tool_call_id": "call_1", "content": "sunny"},
+    {"role": "tool", "tool_call_id": "call_2", "content": [{"type": "text", "text": "rainy"}]},
+    {"role": "tool", "tool_call_id": "call_3", "content": "ok", "cache_control": {"type": "ephemeral", "ttl": "1h"}},
+    {"role": "user", "content": "Thanks", "cache_control": {"type": "ephemeral"}},
+    {"role": "system", "content": "Mid-conversation note."},
+    {"role": "assistant", "content": "Done.", "reasoning_details": [{"type": "reasoning.encrypted", "data": "abc"}], "reasoning_content": "fine"},
+    {"role": "user", "content": [{"type": "file", "file": {"filename": "a.pdf", "file_data": "data:application/pdf;base64,JVBERi0="}}]}
+  ],
+  "tools": [
+    {"type": "function", "function": {"name": "get_weather", "description": "Weather", "parameters": {"type": "object", "properties": {"city": {"type": "string"}}}, "strict": true}, "x_vendor": 1},
+    {"type": "custom", "custom": {"name": "apply_patch", "description": "Patch files", "format": {"type": "grammar", "syntax": "lark", "definition": "start: /.+/"}}}
+  ],
+  "tool_choice": {"type": "function", "function": {"name": "get_weather"}},
+  "parallel_tool_calls": true,
+  "max_tokens": 512,
+  "temperature": 0.2,
+  "top_p": 0.9,
+  "stop": "END",
+  "reasoning_effort": "high",
+  "stream": true,
+  "stream_options": {"include_usage": true},
+  "service_tier": "auto",
+  "prompt_cache_key": "sess-1",
+  "user": "u-42",
+  "seed": 7,
+  "metadata": {"k": "v"}
+}

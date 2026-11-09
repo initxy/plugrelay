@@ -1,0 +1,57 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.snowflake.com/en/user-guide/snowflake-cortex/open_ai_sdk
+# The credential is a programmatic access token (PAT). The role needs
+# SNOWFLAKE.CORTEX_USER or CORTEX_REST_API_USER.
+id: snowflake-cortex
+kind: provider
+name: Snowflake Cortex REST API
+name_zh: "Snowflake Cortex"
+category: cloud
+homepage: https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-rest-api
+interpreter: openai-compatible
+variables:
+  account:
+    required: true
+    description: Account identifier (the <account>.snowflakecomputing.com host).
+    description_zh: "账号标识（<account>.snowflakecomputing.com 里的那一段）。"
+auth:
+  header: Authorization
+  scheme: Bearer
+extra_headers:
+  X-Snowflake-Authorization-Token-Type: PROGRAMMATIC_ACCESS_TOKEN
+capabilities:
+  cache: implicit
+endpoints:
+  # max_tokens is rejected, not just deprecated; service_tier and store
+  # are errors too.
+  - id: chat
+    protocol: openai-chat
+    base_url: https://{account}.snowflakecomputing.com/api/v2/cortex/v1
+    capabilities:
+      freeform_tools: false
+      max_tokens_field: max_completion_tokens
+      unsupported_params: [service_tier, store]
+  # Preview, OpenAI models only; store is always false.
+  - id: responses
+    protocol: openai-responses
+    base_url: https://{account}.snowflakecomputing.com/api/v2/cortex/v1
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  # Claude models only; the token goes in Authorization, not x-api-key.
+  # cache_control breakpoints are honoured (5-minute TTL).
+  - protocol: anthropic
+    base_url: https://{account}.snowflakecomputing.com/api/v2/cortex
+    interpreter: anthropic-compatible
+    capabilities:
+      cache: explicit
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+errors:
+  # Budget exceeded.
+  - when: {status: 402}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}

@@ -1,0 +1,75 @@
+# plugrelay with PostgreSQL (business data) and Redis (shared runtime state).
+# Configuration comes from environment variables only; no relay.yaml is
+# needed. Set the public URL in the console (Settings) after first-run
+# setup. See docs/deployment.md.
+#
+#   cp deploy/.env.example deploy/.env   # then fill in the secrets
+#   docker compose -f deploy/docker-compose.yml up -d
+#
+# The relay port is published on 127.0.0.1 only: put a TLS reverse proxy in
+# front of it (docs/deployment.md) before exposing it.
+#
+# MySQL 8 instead of PostgreSQL: replace the postgres service with
+#   mysql:
+#     image: mysql:8.4
+#     environment: {MYSQL_ROOT_PASSWORD: ..., MYSQL_DATABASE: plugrelay,
+#                   MYSQL_USER: plugrelay, MYSQL_PASSWORD: ${MYSQL_PASSWORD}}
+#     volumes: [mysqldata:/var/lib/mysql]
+#     healthcheck: {test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]}
+# point depends_on at it and set
+#   PLUGRELAY_STORE_DRIVER: mysql
+#   PLUGRELAY_STORE_DSN: plugrelay:${MYSQL_PASSWORD}@tcp(mysql:3306)/plugrelay
+name: plugrelay
+
+services:
+  plugrelay:
+    image: ghcr.io/initxy/plugrelay:${PLUGRELAY_VERSION:-latest}
+    # build: {context: .., dockerfile: Dockerfile}   # or build from source
+    restart: unless-stopped
+    # Docker kills the container 10s after SIGTERM by default, before the
+    # relay has let in-flight requests finish (shutdown.grace, 30s) and
+    # written their accounting (shutdown.drain, 60s). Keep this above
+    # grace + drain + 30s; see docs/deployment.md#graceful-shutdown.
+    stop_grace_period: 120s
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    environment:
+      PLUGRELAY_LISTEN: 0.0.0.0:8787
+      PLUGRELAY_MASTER_KEY: ${PLUGRELAY_MASTER_KEY:?set PLUGRELAY_MASTER_KEY (openssl rand -base64 32)}
+      PLUGRELAY_ADMIN_TOKEN: ${PLUGRELAY_ADMIN_TOKEN:-}
+      PLUGRELAY_STORE_DRIVER: postgres
+      PLUGRELAY_STORE_DSN: postgres://plugrelay:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/plugrelay?sslmode=disable
+      PLUGRELAY_STATE_DRIVER: redis
+      PLUGRELAY_STATE_URL: redis://redis:6379/0
+      PLUGRELAY_LOG_FORMAT: json
+    ports:
+      - "127.0.0.1:8787:8787"
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: plugrelay
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: plugrelay
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U plugrelay -d plugrelay"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # State may be lost without harm (cache hits and counters only); no
+    # persistence needed.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  pgdata:

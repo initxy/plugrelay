@@ -1,0 +1,67 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://github.com/maximhq/bifrost
+#   https://docs.getbifrost.ai/openapi/openapi.json
+#   https://docs.getbifrost.ai/integrations/openai-sdk/overview.md
+#   https://docs.getbifrost.ai/integrations/anthropic-sdk/overview.md
+# Self-hosted gateway; provider keys live in its config. Model ids are
+# provider/model. A key (virtual key sk-bf-...) is needed only with
+# governance on.
+id: bifrost
+kind: provider
+name: Bifrost
+category: gateway
+homepage: https://docs.getbifrost.ai
+interpreter: openai-compatible
+variables:
+  server_url:
+    default: http://localhost:8080
+    description: Root URL of the gateway, without /v1.
+    description_zh: "网关的根地址，不带 /v1。"
+auth:
+  key_optional: true
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+endpoints:
+  # Reasoning arrives as `reasoning` with reasoning_details; left off.
+  - id: chat
+    protocol: openai-chat
+    base_url: "{server_url}/v1"
+    capabilities:
+      freeform_tools: false
+      reasoning: false
+  - id: responses
+    protocol: openai-responses
+    base_url: "{server_url}/v1"
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  - id: completions
+    protocol: openai-completions
+    base_url: "{server_url}/v1"
+  - protocol: anthropic
+    base_url: "{server_url}/anthropic"
+    interpreter: anthropic-compatible
+    capabilities:
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: "{server_url}/v1"
+  - id: images
+    protocol: openai-images
+    base_url: "{server_url}/v1"
+  # Transcriptions and speech; translations are not in the API spec.
+  - id: audio
+    protocol: openai-audio
+    base_url: "{server_url}/v1"
+  # Its schema types documents as {text} objects; model is provider/model.
+  - protocol: rerank
+    base_url: "{server_url}/v1"
+models:
+  list: /models

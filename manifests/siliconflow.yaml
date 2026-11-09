@@ -1,0 +1,63 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.siliconflow.com/en/api-reference/chat-completions/chat-completions
+#   https://docs.siliconflow.com/en/api-reference/chat-completions/messages
+#   https://docs.siliconflow.com/en/userguide/guides/fim
+#   https://docs.siliconflow.com/en/faqs/error-code
+#   https://docs.siliconflow.com/en/api-reference/embeddings/create-embeddings.md
+#   https://docs.siliconflow.com/en/api-reference/audio/create-audio-transcriptions.md
+#   https://docs.siliconflow.com/en/api-reference/audio/create-speech.md
+#   https://docs.siliconflow.com/en/api-reference/rerank/create-rerank.md
+id: siliconflow
+kind: provider
+name: SiliconFlow
+name_zh: "硅基流动"
+category: inference
+homepage: https://docs.siliconflow.cn
+variables:
+  host:
+    default: api.siliconflow.cn
+    description: API host; api.siliconflow.com for the international platform.
+    description_zh: "API 域名；国际站填 api.siliconflow.com。"
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://{host}/v1
+    interpreter: openai-compatible
+    capabilities:
+      freeform_tools: false
+      reasoning: reasoning_content
+  - id: completions
+    protocol: openai-completions
+    base_url: https://{host}/v1
+    interpreter: openai-compatible
+    capabilities:
+      fill_in_middle: true
+  - protocol: anthropic
+    base_url: https://{host}
+    interpreter: anthropic-compatible
+    capabilities:
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+  - id: embeddings
+    protocol: openai-embeddings
+    interpreter: openai-compatible
+    base_url: https://{host}/v1
+  # Transcriptions and speech; no translations. /images/generations is
+  # left out: it answers {images: [...]}, not OpenAI's data[].
+  - id: audio
+    protocol: openai-audio
+    interpreter: openai-compatible
+    base_url: https://{host}/v1
+  # String documents only; usage arrives as tokens.input_tokens.
+  - protocol: rerank
+    interpreter: openai-compatible
+    base_url: https://{host}/v1
+models:
+  list: /models

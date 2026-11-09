@@ -1,0 +1,50 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://platform.minimax.io/docs/api-reference/text-openai-api.md
+#   https://platform.minimax.io/docs/api-reference/text-anthropic-api.md
+#   https://platform.minimax.io/docs/api-reference/responses-create.md
+#   https://platform.minimax.io/docs/api-reference/errorcode.md
+#   https://platform.minimax.io/docs/api-reference/text-prompt-caching
+# The international platform (platform.minimax.io) with its own keys. The
+# China platform is minimax. Image, speech and embedding routes use
+# MiniMax's own shapes and are not declared.
+id: minimax-intl
+kind: provider
+name: MiniMax (international)
+name_zh: "MiniMax（国际版）"
+category: vendor
+homepage: https://platform.minimax.io/docs
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api.minimax.io/v1
+    capabilities:
+      freeform_tools: false
+      max_tokens_field: max_completion_tokens
+      # Reasoning comes back in reasoning_content only when the request sets
+      # reasoning_split, otherwise inline as <think> in content; left off.
+      reasoning: false
+      unsupported_params: [presence_penalty, frequency_penalty, logit_bias]
+  - id: responses
+    protocol: openai-responses
+    base_url: https://api.minimax.io/v1
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  - protocol: anthropic
+    base_url: https://api.minimax.io/anthropic
+    interpreter: anthropic-compatible
+    capabilities:
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+models:
+  list: /models

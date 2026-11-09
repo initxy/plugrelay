@@ -1,0 +1,1 @@
+{"requests":[{"model":"models/gemini-embedding-001","content":{"parts":[{"text":"first"},{"text":"line two"}]},"taskType":"RETRIEVAL_DOCUMENT","title":"Doc","outputDimensionality":768},{"model":"models/gemini-embedding-001","content":{"parts":[{"text":"second"}]}}]}

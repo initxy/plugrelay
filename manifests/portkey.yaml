@@ -1,0 +1,61 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://raw.githubusercontent.com/Portkey-AI/openapi/refs/heads/master/openapi.yaml
+#   https://portkey.ai/docs/llms.txt
+# Hosted Portkey gateway. The credential secret is the Portkey API key;
+# the route to a provider comes from a saved config: set the credential's
+# meta key "config" to its id. Model ids may also carry the provider
+# (@provider-slug/model).
+id: portkey
+kind: provider
+name: Portkey AI Gateway
+name_zh: "Portkey AI 网关"
+category: gateway
+homepage: https://portkey.ai/docs
+interpreter: openai-compatible
+auth:
+  header: x-portkey-api-key
+  scheme: raw
+owned_headers: [x-portkey-config, x-portkey-provider, x-portkey-virtual-key, Authorization]
+credential_headers:
+  x-portkey-config: config
+capabilities:
+  cache: none
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api.portkey.ai/v1
+    capabilities:
+      freeform_tools: false
+  - id: responses
+    protocol: openai-responses
+    base_url: https://api.portkey.ai/v1
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  - id: completions
+    protocol: openai-completions
+    base_url: https://api.portkey.ai/v1
+  - protocol: anthropic
+    base_url: https://api.portkey.ai
+    interpreter: anthropic-compatible
+    capabilities:
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: https://api.portkey.ai/v1
+  - id: images
+    protocol: openai-images
+    base_url: https://api.portkey.ai/v1
+  - id: audio
+    protocol: openai-audio
+    base_url: https://api.portkey.ai/v1
+  # Usage arrives as usage.search_units only.
+  - protocol: rerank
+    base_url: https://api.portkey.ai/v1
+models:
+  list: /models

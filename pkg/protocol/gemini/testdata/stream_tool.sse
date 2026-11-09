@@ -1,0 +1,12 @@
+data: {"candidates":[{"content":{"role":"model","parts":[{"text":"**Planning** the","thought":true}]},"index":0}],"usageMetadata":{"promptTokenCount":500,"totalTokenCount":500},"modelVersion":"gemini-2.5-flash","responseId":"r-1"}
+
+data: {"candidates":[{"content":{"role":"model","parts":[{"text":" lookup.","thought":true}]},"index":0}],"modelVersion":"gemini-2.5-flash","responseId":"r-1"}
+
+data: {"candidates":[{"content":{"role":"model","parts":[{"text":"Let me check"}]},"index":0}],"modelVersion":"gemini-2.5-flash","responseId":"r-1"}
+
+data: {"candidates":[{"content":{"role":"model","parts":[{"text":" the weather."}]},"index":0}],"modelVersion":"gemini-2.5-flash","responseId":"r-1"}
+
+data: {"candidates":[{"content":{"role":"model","parts":[{"functionCall":{"name":"get_weather","args":{"city":"Paris"}},"thoughtSignature":"c2lnLWZj"}]},"index":0}],"modelVersion":"gemini-2.5-flash","responseId":"r-1"}
+
+data: {"candidates":[{"content":{"role":"model","parts":[{"text":""}]},"finishReason":"STOP","index":0}],"usageMetadata":{"promptTokenCount":500,"candidatesTokenCount":40,"totalTokenCount":560,"cachedContentTokenCount":200,"thoughtsTokenCount":20},"modelVersion":"gemini-2.5-flash","responseId":"r-1"}
+

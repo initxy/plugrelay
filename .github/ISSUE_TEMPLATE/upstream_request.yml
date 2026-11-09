@@ -1,0 +1,11 @@
+name: New upstream
+description: Ask for (or offer) an official manifest for an upstream
+labels: [upstream]
+body:
+  - type: input
+    id: name
+    attributes: {label: Upstream name and docs URL}
+    validations: {required: true}
+  - type: textarea
+    id: protocols
+    attributes: {label: Protocols it speaks and known differences (caching, reasoning fields, errors)}

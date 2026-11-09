@@ -1,0 +1,45 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://raw.githubusercontent.com/songquanpeng/one-api/main/README.md
+#   https://raw.githubusercontent.com/songquanpeng/one-api/main/router/relay.go
+# A One API site used as an upstream; the credential secret is a token the
+# site issued. The project's last release is v0.6.10 (2025-02); it has no
+# Responses or Anthropic route.
+id: one-api
+kind: provider
+name: One API
+category: gateway
+homepage: https://github.com/songquanpeng/one-api
+interpreter: openai-compatible
+variables:
+  base_url:
+    default: http://localhost:3000/v1
+    description: OpenAI-compatible base URL of the site, including /v1.
+    description_zh: "站点的 OpenAI 兼容地址，带 /v1。"
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: "{base_url}"
+    capabilities:
+      freeform_tools: false
+  - id: completions
+    protocol: openai-completions
+    base_url: "{base_url}"
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: "{base_url}"
+  # Generations only; /images/edits is not implemented.
+  - id: images
+    protocol: openai-images
+    base_url: "{base_url}"
+    capabilities:
+      image_edit: false
+  - id: audio
+    protocol: openai-audio
+    base_url: "{base_url}"
+models:
+  list: /models

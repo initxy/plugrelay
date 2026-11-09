@@ -1,0 +1,44 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://platform.stepfun.com/docs/api-reference/chat/chat-completion-create
+#   https://platform.stepfun.com/docs/zh/api-reference/error-codes
+#   https://platform.stepfun.ai/docs/en/api-reference/chat/messages-create
+# The Step Plan subscription uses /step_plan/v1 and /step_plan instead.
+id: stepfun
+kind: provider
+name: StepFun
+name_zh: "阶跃星辰"
+category: vendor
+homepage: https://platform.stepfun.com/docs
+variables:
+  host:
+    default: api.stepfun.com
+    description: API host; api.stepfun.ai for the international platform.
+    description_zh: "API 域名；国际站填 api.stepfun.ai。"
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://{host}/v1
+    interpreter: openai-compatible
+    capabilities:
+      freeform_tools: false
+  - protocol: anthropic
+    base_url: https://{host}
+    interpreter: anthropic-compatible
+    capabilities:
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+errors:
+  # Organization credit limits arrive as 429.
+  - when: {code: project_credit_limit_exceeded}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: member_project_credit_limit_exceeded}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {status: 451}
+    verdict: {cause: content, signal: content_filtered}

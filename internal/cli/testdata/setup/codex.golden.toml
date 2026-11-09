@@ -1,0 +1,18 @@
+# Codex settings
+model = "gpt-5.5"
+approval_policy = "on-request"
+model_reasoning_effort = "high"
+model_provider = "plugrelay"
+
+[model_providers.plugrelay]
+name = "plugrelay"
+base_url = "http://127.0.0.1:8787/v1"
+env_key = "PLUGRELAY_API_KEY"
+wire_api = "responses"
+
+[model_providers.ollama]
+name = "Ollama"
+base_url = "http://localhost:11434/v1"
+
+[profiles.fast]
+model = "gpt-5.5-mini"

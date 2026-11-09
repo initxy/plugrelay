@@ -1,0 +1,45 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://github.com/kserve/website/blob/main/docs/model-serving/generative-inference/overview.md
+#   https://github.com/kserve/website/blob/main/docs/model-serving/generative-inference/tasks/text-generation/text-generation.md
+#   https://github.com/kserve/website/blob/main/docs/model-serving/generative-inference/tasks/embedding/embedding.md
+#   https://github.com/kserve/website/blob/main/docs/model-serving/generative-inference/tasks/reranking/rerank.md
+# The /openai prefix comes from KSERVE_OPENAI_ROUTE_PREFIX. Use the
+# InferenceService URL directly; going through the ingress IP needs a
+# Host header this manifest does not set.
+id: kserve
+kind: provider
+name: KServe (Hugging Face runtime)
+name_zh: "KServe（Hugging Face 运行时）"
+category: self_hosted
+homepage: https://kserve.github.io/website/
+interpreter: openai-compatible
+variables:
+  base_url:
+    default: http://localhost:8080/openai/v1
+    description: OpenAI-compatible base URL of the InferenceService, including /openai/v1.
+    description_zh: "InferenceService 的 OpenAI 兼容地址，带 /openai/v1。"
+# No built-in auth (configure it at the gateway); an empty credential
+# secret sends no Authorization header.
+auth:
+  key_optional: true
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: "{base_url}"
+    capabilities:
+      freeform_tools: false
+  - id: completions
+    protocol: openai-completions
+    base_url: "{base_url}"
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: "{base_url}"
+  # vLLM backend only (--task=score); the transformers backend has none.
+  - protocol: rerank
+    base_url: "{base_url}"
+models:
+  list: /models

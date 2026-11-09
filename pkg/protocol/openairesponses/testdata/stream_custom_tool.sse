@@ -1,0 +1,114 @@
+event: response.created
+data: {"type":"response.created","response":{"id":"resp_01c33408f71107f9006aec841a2fa08195a7a849b1b967bd48","object":"response","created_at":1793885210,"status":"in_progress","access_programs":null,"background":false,"completed_at":null,"content_filters":null,"error":null,"frequency_penalty":0.0,"incomplete_details":null,"instructions":null,"max_output_tokens":128000,"max_tool_calls":null,"model":"deployment-gpt-5.5-2026-04-24-platform-global","moderation":null,"output":[],"parallel_tool_calls":true,"presence_penalty":0.0,"previous_response_id":null,"prompt_cache_key":null,"prompt_cache_retention":"24h","reasoning":{"context":"current_turn","effort":"low","mode":"standard","summary":"detailed"},"safety_identifier":null,"service_tier":"default","store":true,"temperature":1.0,"text":{"format":{"type":"text"},"verbosity":"medium"},"tool_choice":"auto","tool_usage":{"image_gen":{"input_tokens":0,"input_tokens_details":{"image_tokens":0,"text_tokens":0},"output_tokens":0,"output_tokens_details":{"image_tokens":0,"text_tokens":0},"total_tokens":0},"web_search":{"num_requests":0}},"tools":[{"type":"custom","description":"Use the apply_patch tool to edit files.","format":{"type":"grammar","definition":"start: begin_patch hunk+ end_patch\nbegin_patch: \"*** Begin Patch\" LF\nend_patch: \"*** End Patch\" LF?\n\nhunk: add_hunk | delete_hunk | update_hunk\nadd_hunk: \"*** Add File: \" filename LF add_line+\ndelete_hunk: \"*** Delete File: \" filename LF\nupdate_hunk: \"*** Update File: \" filename LF change_move? change?\n\nfilename: /(.+)/\nadd_line: \"+\" /(.*)/ LF -> line\n\nchange_move: \"*** Move to: \" filename LF\nchange: (change_context | change_line)+ eof_line?\nchange_context: (\"@@\" | \"@@ \" /(.+)/) LF\nchange_line: (\"+\" | \"-\" | \" \") /(.*)/ LF\neof_line: \"*** End of File\" LF\n\n%import common.LF\n","syntax":"lark"},"name":"apply_patch"}],"top_logprobs":0,"top_p":0.98,"truncation":"disabled","usage":null,"user":null,"metadata":{}},"sequence_number":0}
+
+event: response.in_progress
+data: {"type":"response.in_progress","response":{"id":"resp_01c33408f71107f9006aec841a2fa08195a7a849b1b967bd48","object":"response","created_at":1793885210,"status":"in_progress","access_programs":null,"background":false,"completed_at":null,"content_filters":null,"error":null,"frequency_penalty":0.0,"incomplete_details":null,"instructions":null,"max_output_tokens":128000,"max_tool_calls":null,"model":"deployment-gpt-5.5-2026-04-24-platform-global","moderation":null,"output":[],"parallel_tool_calls":true,"presence_penalty":0.0,"previous_response_id":null,"prompt_cache_key":null,"prompt_cache_retention":"24h","reasoning":{"context":"current_turn","effort":"low","mode":"standard","summary":"detailed"},"safety_identifier":null,"service_tier":"default","store":true,"temperature":1.0,"text":{"format":{"type":"text"},"verbosity":"medium"},"tool_choice":"auto","tool_usage":{"image_gen":{"input_tokens":0,"input_tokens_details":{"image_tokens":0,"text_tokens":0},"output_tokens":0,"output_tokens_details":{"image_tokens":0,"text_tokens":0},"total_tokens":0},"web_search":{"num_requests":0}},"tools":[{"type":"custom","description":"Use the apply_patch tool to edit files.","format":{"type":"grammar","definition":"start: begin_patch hunk+ end_patch\nbegin_patch: \"*** Begin Patch\" LF\nend_patch: \"*** End Patch\" LF?\n\nhunk: add_hunk | delete_hunk | update_hunk\nadd_hunk: \"*** Add File: \" filename LF add_line+\ndelete_hunk: \"*** Delete File: \" filename LF\nupdate_hunk: \"*** Update File: \" filename LF change_move? change?\n\nfilename: /(.+)/\nadd_line: \"+\" /(.*)/ LF -> line\n\nchange_move: \"*** Move to: \" filename LF\nchange: (change_context | change_line)+ eof_line?\nchange_context: (\"@@\" | \"@@ \" /(.+)/) LF\nchange_line: (\"+\" | \"-\" | \" \") /(.*)/ LF\neof_line: \"*** End of File\" LF\n\n%import common.LF\n","syntax":"lark"},"name":"apply_patch"}],"top_logprobs":0,"top_p":0.98,"truncation":"disabled","usage":null,"user":null,"metadata":{}},"sequence_number":1}
+
+event: response.output_item.added
+data: {"item":{"content":[],"id":"msg_01c33408f71107f9006aec841bfca08195a365b770880b2cfc","phase":"commentary","role":"assistant","status":"in_progress","type":"message"},"message":"{\"x-model-first-token-timing\":2124,\"x-model-network-latency\":9}","output_index":0,"sequence_number":2,"type":"response.output_item.added"}
+
+event: response.content_part.added
+data: {"type":"response.content_part.added","content_index":0,"item_id":"msg_01c33408f71107f9006aec841bfca08195a365b770880b2cfc","output_index":0,"part":{"type":"output_text","annotations":[],"logprobs":[],"text":""},"sequence_number":3}
+
+event: response.output_text.delta
+data: {"content_index":0,"delta":"I","item_id":"msg_01c33408f71107f9006aec841bfca08195a365b770880b2cfc","logprobs":[],"message":"{\"x-model-first-token-timing\":2130,\"x-model-network-latency\":9}","obfuscation":"xNVr58xI3HZlMkZ","output_index":0,"sequence_number":4,"type":"response.output_text.delta"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":" will","item_id":"msg_01c33408f71107f9006aec841bfca08195a365b770880b2cfc","logprobs":[],"obfuscation":"PWhWnyTQO5L","output_index":0,"sequence_number":5}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":" add","item_id":"msg_01c33408f71107f9006aec841bfca08195a365b770880b2cfc","logprobs":[],"obfuscation":"vKcYjAD82bo3","output_index":0,"sequence_number":6}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":" the","item_id":"msg_01c33408f71107f9006aec841bfca08195a365b770880b2cfc","logprobs":[],"obfuscation":"bWrBCIUhr4Ja","output_index":0,"sequence_number":7}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":" requested","item_id":"msg_01c33408f71107f9006aec841bfca08195a365b770880b2cfc","logprobs":[],"obfuscation":"u9IBhp","output_index":0,"sequence_number":8}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":" hello","item_id":"msg_01c33408f71107f9006aec841bfca08195a365b770880b2cfc","logprobs":[],"obfuscation":"R84dNAKtH7","output_index":0,"sequence_number":9}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":".txt","item_id":"msg_01c33408f71107f9006aec841bfca08195a365b770880b2cfc","logprobs":[],"obfuscation":"HvFBYCWjxmTB","output_index":0,"sequence_number":10}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":" file","item_id":"msg_01c33408f71107f9006aec841bfca08195a365b770880b2cfc","logprobs":[],"obfuscation":"S0L9WOPVZ3k","output_index":0,"sequence_number":11}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":".","item_id":"msg_01c33408f71107f9006aec841bfca08195a365b770880b2cfc","logprobs":[],"obfuscation":"Z7SrnfkuDfA7SMh","output_index":0,"sequence_number":12}
+
+event: response.output_text.done
+data: {"type":"response.output_text.done","content_index":0,"item_id":"msg_01c33408f71107f9006aec841bfca08195a365b770880b2cfc","logprobs":[],"output_index":0,"sequence_number":13,"text":"I will add the requested hello.txt file."}
+
+event: response.content_part.done
+data: {"type":"response.content_part.done","content_index":0,"item_id":"msg_01c33408f71107f9006aec841bfca08195a365b770880b2cfc","output_index":0,"part":{"type":"output_text","annotations":[],"logprobs":[],"text":"I will add the requested hello.txt file."},"sequence_number":14}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","item":{"id":"msg_01c33408f71107f9006aec841bfca08195a365b770880b2cfc","type":"message","status":"completed","content":[{"type":"output_text","annotations":[],"logprobs":[],"text":"I will add the requested hello.txt file."}],"phase":"commentary","role":"assistant"},"output_index":0,"sequence_number":15}
+
+event: response.output_item.added
+data: {"type":"response.output_item.added","item":{"id":"ctc_01c33408f71107f9006aec841c2e388195a119c3ad5351b63a","type":"custom_tool_call","status":"in_progress","call_id":"call_CGBCZuhQCB8MdX2WQKzduvSy","input":"","name":"apply_patch"},"output_index":1,"sequence_number":16}
+
+event: response.custom_tool_call_input.delta
+data: {"type":"response.custom_tool_call_input.delta","delta":"***","item_id":"ctc_01c33408f71107f9006aec841c2e388195a119c3ad5351b63a","obfuscation":"76JbrjKau8tBE","output_index":1,"sequence_number":17}
+
+event: response.custom_tool_call_input.delta
+data: {"type":"response.custom_tool_call_input.delta","delta":" Begin","item_id":"ctc_01c33408f71107f9006aec841c2e388195a119c3ad5351b63a","obfuscation":"6VPo4DnuvN","output_index":1,"sequence_number":18}
+
+event: response.custom_tool_call_input.delta
+data: {"type":"response.custom_tool_call_input.delta","delta":" Patch","item_id":"ctc_01c33408f71107f9006aec841c2e388195a119c3ad5351b63a","obfuscation":"5lOoJZqkAg","output_index":1,"sequence_number":19}
+
+event: response.custom_tool_call_input.delta
+data: {"type":"response.custom_tool_call_input.delta","delta":"\n","item_id":"ctc_01c33408f71107f9006aec841c2e388195a119c3ad5351b63a","obfuscation":"cSixZHCHpkF8FJI","output_index":1,"sequence_number":20}
+
+event: response.custom_tool_call_input.delta
+data: {"type":"response.custom_tool_call_input.delta","delta":"***","item_id":"ctc_01c33408f71107f9006aec841c2e388195a119c3ad5351b63a","obfuscation":"WYN9cnaCpMbqy","output_index":1,"sequence_number":21}
+
+event: response.custom_tool_call_input.delta
+data: {"type":"response.custom_tool_call_input.delta","delta":" Add","item_id":"ctc_01c33408f71107f9006aec841c2e388195a119c3ad5351b63a","obfuscation":"F3vg8ZoGf0Lf","output_index":1,"sequence_number":22}
+
+event: response.custom_tool_call_input.delta
+data: {"type":"response.custom_tool_call_input.delta","delta":" File","item_id":"ctc_01c33408f71107f9006aec841c2e388195a119c3ad5351b63a","obfuscation":"HqjOpR7heci","output_index":1,"sequence_number":23}
+
+event: response.custom_tool_call_input.delta
+data: {"type":"response.custom_tool_call_input.delta","delta":":","item_id":"ctc_01c33408f71107f9006aec841c2e388195a119c3ad5351b63a","obfuscation":"k0KDUUnfpfhyw7O","output_index":1,"sequence_number":24}
+
+event: response.custom_tool_call_input.delta
+data: {"type":"response.custom_tool_call_input.delta","delta":" hello","item_id":"ctc_01c33408f71107f9006aec841c2e388195a119c3ad5351b63a","obfuscation":"uWXfkPdJzN","output_index":1,"sequence_number":25}
+
+event: response.custom_tool_call_input.delta
+data: {"type":"response.custom_tool_call_input.delta","delta":".txt","item_id":"ctc_01c33408f71107f9006aec841c2e388195a119c3ad5351b63a","obfuscation":"4NUvbc9QhDWT","output_index":1,"sequence_number":26}
+
+event: response.custom_tool_call_input.delta
+data: {"type":"response.custom_tool_call_input.delta","delta":"\n","item_id":"ctc_01c33408f71107f9006aec841c2e388195a119c3ad5351b63a","obfuscation":"OggEyFvJm9ToScn","output_index":1,"sequence_number":27}
+
+event: response.custom_tool_call_input.delta
+data: {"type":"response.custom_tool_call_input.delta","delta":"+","item_id":"ctc_01c33408f71107f9006aec841c2e388195a119c3ad5351b63a","obfuscation":"XT8eXK6WqjJEzNj","output_index":1,"sequence_number":28}
+
+event: response.custom_tool_call_input.delta
+data: {"type":"response.custom_tool_call_input.delta","delta":"hi","item_id":"ctc_01c33408f71107f9006aec841c2e388195a119c3ad5351b63a","obfuscation":"LiI9543m11Mr53","output_index":1,"sequence_number":29}
+
+event: response.custom_tool_call_input.delta
+data: {"type":"response.custom_tool_call_input.delta","delta":" there","item_id":"ctc_01c33408f71107f9006aec841c2e388195a119c3ad5351b63a","obfuscation":"U4xfI4Zxsn","output_index":1,"sequence_number":30}
+
+event: response.custom_tool_call_input.delta
+data: {"type":"response.custom_tool_call_input.delta","delta":"\n","item_id":"ctc_01c33408f71107f9006aec841c2e388195a119c3ad5351b63a","obfuscation":"AtpRQLPh1YsfFVZ","output_index":1,"sequence_number":31}
+
+event: response.custom_tool_call_input.delta
+data: {"type":"response.custom_tool_call_input.delta","delta":"***","item_id":"ctc_01c33408f71107f9006aec841c2e388195a119c3ad5351b63a","obfuscation":"GfVZGZYORG1C9","output_index":1,"sequence_number":32}
+
+event: response.custom_tool_call_input.delta
+data: {"type":"response.custom_tool_call_input.delta","delta":" End Patch","item_id":"ctc_01c33408f71107f9006aec841c2e388195a119c3ad5351b63a","obfuscation":"VFCXgG","output_index":1,"sequence_number":33}
+
+event: response.custom_tool_call_input.delta
+data: {"type":"response.custom_tool_call_input.delta","delta":"\n","item_id":"ctc_01c33408f71107f9006aec841c2e388195a119c3ad5351b63a","obfuscation":"TyMqDU3QQDMG9ds","output_index":1,"sequence_number":34}
+
+event: response.custom_tool_call_input.done
+data: {"type":"response.custom_tool_call_input.done","input":"*** Begin Patch\n*** Add File: hello.txt\n+hi there\n*** End Patch\n","item_id":"ctc_01c33408f71107f9006aec841c2e388195a119c3ad5351b63a","output_index":1,"sequence_number":35}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","item":{"id":"ctc_01c33408f71107f9006aec841c2e388195a119c3ad5351b63a","type":"custom_tool_call","status":"completed","call_id":"call_CGBCZuhQCB8MdX2WQKzduvSy","input":"*** Begin Patch\n*** Add File: hello.txt\n+hi there\n*** End Patch\n","name":"apply_patch"},"output_index":1,"sequence_number":36}
+
+event: response.completed
+data: {"type":"response.completed","response":{"id":"resp_01c33408f71107f9006aec841a2fa08195a7a849b1b967bd48","object":"response","created_at":1793885210,"status":"completed","access_programs":null,"background":false,"completed_at":1793885212,"content_filters":[{"blocked":false,"source_type":"prompt","content_filter_raw":[],"content_filter_results":{},"content_filter_offsets":{"start_offset":0,"end_offset":93,"check_offset":0}}],"error":null,"frequency_penalty":0.0,"incomplete_details":null,"instructions":null,"max_output_tokens":128000,"max_tool_calls":null,"model":"deployment-gpt-5.5-2026-04-24-platform-global","moderation":null,"output":[{"id":"msg_01c33408f71107f9006aec841bfca08195a365b770880b2cfc","type":"message","status":"completed","content":[{"type":"output_text","annotations":[],"logprobs":[],"text":"I will add the requested hello.txt file."}],"phase":"commentary","role":"assistant"},{"id":"ctc_01c33408f71107f9006aec841c2e388195a119c3ad5351b63a","type":"custom_tool_call","status":"completed","call_id":"call_CGBCZuhQCB8MdX2WQKzduvSy","input":"*** Begin Patch\n*** Add File: hello.txt\n+hi there\n*** End Patch\n","name":"apply_patch"}],"parallel_tool_calls":true,"presence_penalty":0.0,"previous_response_id":null,"prompt_cache_key":null,"prompt_cache_retention":"24h","reasoning":{"context":"current_turn","effort":"low","mode":"standard","summary":"detailed"},"safety_identifier":null,"service_tier":"default","store":true,"temperature":1.0,"text":{"format":{"type":"text"},"verbosity":"medium"},"tool_choice":"auto","tool_usage":{"image_gen":{"input_tokens":0,"input_tokens_details":{"image_tokens":0,"text_tokens":0},"output_tokens":0,"output_tokens_details":{"image_tokens":0,"text_tokens":0},"total_tokens":0},"web_search":{"num_requests":0}},"tools":[{"type":"custom","description":"Use the apply_patch tool to edit files.","format":{"type":"grammar","definition":"start: begin_patch hunk+ end_patch\nbegin_patch: \"*** Begin Patch\" LF\nend_patch: \"*** End Patch\" LF?\n\nhunk: add_hunk | delete_hunk | update_hunk\nadd_hunk: \"*** Add File: \" filename LF add_line+\ndelete_hunk: \"*** Delete File: \" filename LF\nupdate_hunk: \"*** Update File: \" filename LF change_move? change?\n\nfilename: /(.+)/\nadd_line: \"+\" /(.*)/ LF -> line\n\nchange_move: \"*** Move to: \" filename LF\nchange: (change_context | change_line)+ eof_line?\nchange_context: (\"@@\" | \"@@ \" /(.+)/) LF\nchange_line: (\"+\" | \"-\" | \" \") /(.*)/ LF\neof_line: \"*** End of File\" LF\n\n%import common.LF\n","syntax":"lark"},"name":"apply_patch"}],"top_logprobs":0,"top_p":0.98,"truncation":"disabled","usage":{"input_tokens":317,"input_tokens_details":{"cache_write_tokens":0,"cached_tokens":0},"output_tokens":46,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":363},"user":null,"metadata":{}},"sequence_number":37}
+

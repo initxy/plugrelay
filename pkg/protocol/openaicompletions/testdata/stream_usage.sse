@@ -1,0 +1,10 @@
+data: {"id":"cmpl-7a","object":"text_completion","created":1730800001,"choices":[{"text":"if n < 2:","index":0,"logprobs":null,"finish_reason":null}],"model":"deepseek-chat"}
+
+data: {"id":"cmpl-7a","object":"text_completion","created":1730800001,"choices":[{"text":"\n        return n","index":0,"logprobs":null,"finish_reason":null}],"model":"deepseek-chat"}
+
+data: {"id":"cmpl-7a","object":"text_completion","created":1730800001,"choices":[{"text":"","index":0,"logprobs":null,"finish_reason":"stop"}],"model":"deepseek-chat"}
+
+data: {"id":"cmpl-7a","object":"text_completion","created":1730800001,"choices":[],"model":"deepseek-chat","usage":{"prompt_tokens":20,"completion_tokens":9,"total_tokens":29,"prompt_tokens_details":{"cached_tokens":16}}}
+
+data: [DONE]
+

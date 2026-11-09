@@ -1,0 +1,28 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://portal.nousresearch.com/llms.txt
+#   https://portal.nousresearch.com/api/openapi
+# The API spec has string-only message content and no tools.
+id: nous-portal
+kind: provider
+name: Nous Research Portal
+category: vendor
+homepage: https://portal.nousresearch.com
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://inference-api.nousresearch.com/v1
+    capabilities:
+      function_tools: false
+      freeform_tools: false
+      images: false
+      documents: false
+  - id: completions
+    protocol: openai-completions
+    base_url: https://inference-api.nousresearch.com/v1

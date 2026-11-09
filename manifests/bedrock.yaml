@@ -1,0 +1,85 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_InvokeModel.html
+#   https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_InvokeModelWithResponseStream.html
+#   https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys-use.html
+id: bedrock
+kind: provider
+name: Amazon Bedrock (Anthropic models)
+name_zh: "Amazon Bedrock（Anthropic 模型）"
+category: cloud
+homepage: https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-claude.html
+# provider.bedrock rewrites Messages requests into InvokeModel /
+# InvokeModelWithResponseStream calls, signs them with SigV4 and decodes
+# the binary event stream. Map client models to Bedrock model ids or
+# inference profile ids (anthropic.…, us.anthropic.…, global.anthropic.…,
+# or an ARN) as the upstream model name of its routes.
+interpreter: bedrock
+variables:
+  region:
+    default: us-east-1
+    description: AWS region of Bedrock Runtime; also the SigV4 signing region.
+    description_zh: "Bedrock Runtime 所在的 AWS 区域，也用作签名区域。"
+# The credential is access keys (ACCESS_KEY_ID:SECRET_ACCESS_KEY[:SESSION_TOKEN]
+# or JSON), which sign the request, or a Bedrock API key, sent as a bearer
+# token in this header.
+auth:
+  header: Authorization
+  scheme: Bearer
+owned_headers: [X-Amz-Date, X-Amz-Security-Token, X-Amz-Content-Sha256, Accept, X-Amzn-Bedrock-Accept]
+capabilities:
+  cache: explicit
+  cache_1h: false
+  # Anthropic's server-side tools (web search, web fetch, code execution)
+  # are not offered on Bedrock; a plugin or another upstream serves them.
+  server_tools: []
+endpoints:
+  - id: messages
+    protocol: anthropic
+    base_url: https://bedrock-runtime.{region}.amazonaws.com
+    # Thinking signatures from Bedrock are not accepted by the Anthropic
+    # API or Vertex AI, and the other way round.
+    issuer: bedrock
+    # First-party-only betas Bedrock rejects with ValidationException.
+    unsupported_betas:
+      - claude-code-20250219
+      - oauth-2025-04-20
+      - files-api-2025-04-14
+      - mcp-client-2025-04-04
+      - code-execution-2025-05-22
+      - web-fetch-2025-09-10
+      - skills-2025-10-02
+# Bedrock names the error in X-Amzn-ErrorType; provider.bedrock reads it
+# into the code these rules match. Error types:
+# https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_InvokeModel.html#API_runtime_InvokeModel_Errors
+errors:
+  - when: {status: 403, message_contains: "suspended"}
+    verdict: {cause: banned, signal: permission}
+  - when: {signal: content_filtered}
+    verdict: {cause: content, signal: content_filtered}
+  - when: {code: ThrottlingException}
+    verdict: {cause: rate_limit, model_scope: true, signal: rate_limited}
+  # Tokens-per-minute or requests-per-minute quota of the account.
+  - when: {code: ServiceQuotaExceededException}
+    verdict: {cause: rate_limit, model_scope: true, cooldown: 1m, signal: rate_limited}
+  - when: {code: ModelNotReadyException}
+    verdict: {cause: transient, signal: overloaded}
+  - when: {code: ServiceUnavailableException}
+    verdict: {cause: transient, signal: overloaded}
+  - when: {code: ModelTimeoutException}
+    verdict: {cause: transient, signal: timeout}
+  - when: {code: ModelErrorException}
+    verdict: {cause: transient, signal: upstream}
+  - when: {code: ModelStreamErrorException}
+    verdict: {cause: transient, signal: upstream}
+  # Missing IAM permission or model access not granted in this account
+  # and region: this credential cannot serve the model, others may.
+  - when: {code: AccessDeniedException}
+    verdict: {cause: auth_expired, credential: cooldown, cooldown: 10m, model_scope: true, signal: permission}
+  # Unknown, malformed or expired keys (UnrecognizedClientException,
+  # InvalidSignatureException, ExpiredTokenException, …).
+  - when: {signal: authentication}
+    verdict: {cause: auth_expired, credential: cooldown, cooldown: 10m, signal: authentication}
+  - when: {signal: context_too_long}
+    verdict: {cause: request, signal: context_too_long}
+  - when: {code: ValidationException}
+    verdict: {cause: request, signal: invalid_request}

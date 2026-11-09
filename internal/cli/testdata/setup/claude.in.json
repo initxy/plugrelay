@@ -1,0 +1,9 @@
+{
+  "model": "opus",
+  "permissions": {"allow": ["Bash(git status)"], "deny": []},
+  "env": {
+    "HTTPS_PROXY": "http://proxy:3128",
+    "ANTHROPIC_BASE_URL": "https://old.example.com"
+  },
+  "statusLine": {"type": "command", "command": "~/.claude/statusline.sh"}
+}

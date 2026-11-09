@@ -1,0 +1,42 @@
+# Checked 2026-11 against the vendor's official API spec (docs.sambanova.ai
+# refuses automated reads):
+#   https://github.com/sambanova/sambanova-inference-api-spec/blob/main/openapi.documented.json
+#   https://github.com/sambanova/sambanova-python/blob/main/api.md
+# The Anthropic route answers streaming with 501, so it is left out.
+id: sambanova
+kind: provider
+name: SambaNova Cloud
+category: inference
+homepage: https://docs.sambanova.ai
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api.sambanova.ai/v1
+    capabilities:
+      freeform_tools: false
+  # No previous_response_id, no server-side tools.
+  - id: responses
+    protocol: openai-responses
+    base_url: https://api.sambanova.ai/v1
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  - id: completions
+    protocol: openai-completions
+    base_url: https://api.sambanova.ai/v1
+errors:
+  # Model deprecated or removed; another upstream may still serve it.
+  - when: {status: 410}
+    verdict: {cause: request, retry: next, signal: not_found}
+models:
+  list: /models

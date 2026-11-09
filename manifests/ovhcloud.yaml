@@ -1,0 +1,25 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.ovhcloud.com/en/guides/public-cloud/ai-machine-learning/ai-endpoints-getting-started
+#   https://docs.ovhcloud.com/en/guides/public-cloud/ai-machine-learning/ai-endpoints-troubleshooting
+# The Responses route requires store:false and drops many fields, so it is
+# left out; the model catalog lives on a separate host.
+id: ovhcloud
+kind: provider
+name: OVHcloud AI Endpoints
+category: cloud
+homepage: https://endpoints.ai.cloud.ovh.net
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://oai.endpoints.kepler.ai.cloud.ovh.net/v1
+    capabilities:
+      freeform_tools: false
+  - id: completions
+    protocol: openai-completions
+    base_url: https://oai.endpoints.kepler.ai.cloud.ovh.net/v1

@@ -1,0 +1,1 @@
+{"documents":["Berlin is in Germany.","Paris is the capital of France.","France borders Spain."],"model":"jina-reranker-v2-base-multilingual","query":"capital of France","top_n":2}

@@ -1,0 +1,55 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://learn.microsoft.com/en-us/azure/ai-foundry/openai/api-version-lifecycle
+#   https://learn.microsoft.com/en-us/rest/api/microsoft-foundry/modelinference/
+#   https://learn.microsoft.com/en-us/azure/foundry/foundry-models/how-to/use-foundry-models-claude
+# Models sold by Azure (DeepSeek, Grok, Llama, ...) on the v1 route, which
+# needs no api-version; the model field is the deployment name. Claude
+# deployments answer only on the Anthropic route. The credential is a
+# resource key; Entra ID tokens are not handled by this manifest.
+id: azure-ai-foundry
+kind: provider
+name: Azure AI Foundry Models
+name_zh: "Azure AI Foundry 模型"
+category: cloud
+homepage: https://learn.microsoft.com/azure/ai-foundry/
+variables:
+  resource:
+    required: true
+    description: Foundry resource name (the <resource>.services.ai.azure.com host).
+    description_zh: "Foundry 资源名（<resource>.services.ai.azure.com 里的那一段）。"
+auth:
+  header: api-key
+  scheme: raw
+owned_headers: [Authorization]
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://{resource}.services.ai.azure.com/openai/v1
+    interpreter: openai-compatible
+    capabilities:
+      cache: none
+      freeform_tools: false
+  - id: responses
+    protocol: openai-responses
+    base_url: https://{resource}.services.ai.azure.com/openai/v1
+    interpreter: openai-compatible
+    capabilities:
+      cache: none
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  - protocol: anthropic
+    base_url: https://{resource}.services.ai.azure.com/anthropic
+    interpreter: anthropic-compatible
+    auth:
+      header: x-api-key
+      scheme: raw
+    capabilities:
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+errors:
+  - when: {code: content_filter}
+    verdict: {cause: content, signal: content_filtered}

@@ -1,0 +1,36 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.requesty.ai/api-reference/inference-apis
+#   https://docs.requesty.ai/features/auto-caching
+# The docs give two different bases for the Anthropic route, so it is left
+# out until one is confirmed.
+id: requesty
+kind: provider
+name: Requesty
+category: gateway
+homepage: https://docs.requesty.ai
+interpreter: openai-compatible
+variables:
+  host:
+    default: router.requesty.ai
+    description: API host; router.eu.requesty.ai for the EU region.
+    description_zh: "API 域名；欧盟区域填 router.eu.requesty.ai。"
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://{host}/v1
+    capabilities:
+      freeform_tools: false
+  - id: responses
+    protocol: openai-responses
+    base_url: https://{host}/v1
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false

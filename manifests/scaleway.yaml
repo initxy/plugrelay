@@ -1,0 +1,41 @@
+# Checked 2026-11 against the vendor's docs, read from their source
+# repository because the site refuses automated reads:
+#   https://github.com/scaleway/docs-content/blob/main/pages/generative-apis/how-to/query-language-models.mdx
+#   https://github.com/scaleway/docs-content/blob/main/pages/generative-apis/reference-content/openai-compatibility.mdx
+#   https://github.com/scaleway/docs-content/blob/main/pages/generative-apis/troubleshooting/fixing-common-issues.mdx
+id: scaleway
+kind: provider
+name: Scaleway Generative APIs
+name_zh: "Scaleway 生成式 API"
+category: cloud
+homepage: https://www.scaleway.com/en/docs/generative-apis/
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api.scaleway.ai/v1
+    capabilities:
+      freeform_tools: false
+      reasoning: reasoning_content
+  - id: responses
+    protocol: openai-responses
+    base_url: https://api.scaleway.ai/v1
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+errors:
+  - when: {status: 400, message_contains: "maximum context window"}
+    verdict: {cause: request, signal: context_too_long}
+  # Model temporarily locked.
+  - when: {status: 423}
+    verdict: {cause: transient, credential: keep, retry: next}
+models:
+  list: /models

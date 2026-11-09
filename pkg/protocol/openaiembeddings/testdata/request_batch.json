@@ -1,0 +1,1 @@
+{"model":"text-embedding-3-small","input":["first text","second text"],"dimensions":256,"encoding_format":"base64","user":"u-1","extra_field":{"keep":true}}

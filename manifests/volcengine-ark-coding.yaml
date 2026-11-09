@@ -1,0 +1,43 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.volcengine.com/docs/82379/1925114
+#   https://ark.volcengine.com/region:cn-beijing/docs/error-codes
+# The Ark Coding Plan: its quota applies only on these routes (the
+# ordinary /api/v3 routes bill pay-as-you-go) and only to coding tools.
+id: volcengine-ark-coding
+kind: provider
+name: Volcengine Ark Coding Plan
+name_zh: "火山方舟 Coding Plan"
+category: cloud
+homepage: https://www.volcengine.com/docs/82379
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://ark.cn-beijing.volces.com/api/coding/v3
+    interpreter: openai-compatible
+    capabilities:
+      freeform_tools: false
+      reasoning: reasoning_content
+  - protocol: anthropic
+    base_url: https://ark.cn-beijing.volces.com/api/coding
+    interpreter: anthropic-compatible
+    capabilities:
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+errors:
+  # 5-hour, weekly and monthly plan windows.
+  - when: {code: QuotaExceeded}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: QuotaExceeded.AgentPlanQuotaExceeded}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  # Plan not subscribed or expired: an operator must renew it.
+  - when: {code: InvalidSubscription}
+    verdict: {cause: quota, credential: manual, retry: next, signal: quota_exhausted}
+  # Model outside the plan; another upstream may serve it.
+  - when: {code: UnsupportedModel}
+    verdict: {cause: request, retry: next, signal: not_found}

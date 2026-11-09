@@ -1,0 +1,49 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.withmartian.com/api-reference/endpoints
+#   https://docs.withmartian.com/api-reference/authentication
+#   https://docs.withmartian.com/api-reference/errors
+#   https://docs.withmartian.com/api-reference/advanced
+# A model router; model ids are provider/model (openai/gpt-4.1-nano).
+id: martian
+kind: provider
+name: Martian
+category: gateway
+homepage: https://docs.withmartian.com
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api.withmartian.com/v1
+    capabilities:
+      freeform_tools: false
+      max_tokens_field: max_completion_tokens
+      unsupported_params: [n]
+  - id: responses
+    protocol: openai-responses
+    base_url: https://api.withmartian.com/v1
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  # cache_control breakpoints are honoured for Anthropic models.
+  - protocol: anthropic
+    base_url: https://api.withmartian.com
+    interpreter: anthropic-compatible
+    capabilities:
+      cache: explicit
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+errors:
+  # Out of credit arrives as 403, which would otherwise quarantine the key.
+  - when: {code: insufficient_credits}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+models:
+  list: /models

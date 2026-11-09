@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="plugrelay">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#14929c"/><stop offset="1" stop-color="#0a5960"/></linearGradient></defs>
+  <rect width="64" height="64" rx="15" fill="url(#g)"/>
+  <g fill="none" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8 24h8M8 40h8M16 16h10a16 16 0 0 1 0 32H16zM42 32h12" stroke="#fff"/>
+    <path d="M49 26l6 6-6 6" stroke="#7ff0e6"/>
+  </g>
+</svg>

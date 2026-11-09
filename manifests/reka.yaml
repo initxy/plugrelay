@@ -1,0 +1,22 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.reka.ai/chat/api-reference/create-chat-completion
+id: reka
+kind: provider
+name: Reka
+category: vendor
+homepage: https://docs.reka.ai
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api.reka.ai/v1
+    capabilities:
+      freeform_tools: false
+models:
+  list: /models

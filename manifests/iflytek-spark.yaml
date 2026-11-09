@@ -1,0 +1,39 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://www.xfyun.cn/doc/spark/HTTP调用文档.html
+#   https://www.xfyun.cn/doc/spark/X1http.html
+# The credential is the APIPassword of one model version from the console.
+id: iflytek-spark
+kind: provider
+name: iFlytek Spark
+name_zh: "讯飞星火"
+category: vendor
+homepage: https://www.xfyun.cn/doc/spark/
+variables:
+  api_path:
+    default: v1
+    description: Route prefix for the model family; v1 for Lite/Pro/Max/Ultra, v2 for X1.5, x2 for X2.
+    description_zh: "模型系列的路径前缀；Lite/Pro/Max/Ultra 填 v1，X1.5 填 v2，X2 填 x2。"
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://spark-api-open.xf-yun.com/{api_path}
+    interpreter: openai-compatible
+    capabilities:
+      freeform_tools: false
+      reasoning: reasoning_content
+errors:
+  # Codes in the top-level code field.
+  - when: {code: "11201"}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: "10013"}
+    verdict: {cause: content, signal: content_filtered}
+  - when: {code: "10014"}
+    verdict: {cause: content, signal: content_filtered}
+  - when: {code: "10907"}
+    verdict: {cause: request, signal: context_too_long}

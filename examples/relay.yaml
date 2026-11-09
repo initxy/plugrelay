@@ -1,0 +1,76 @@
+# relay.yaml — plugrelay bootstrap configuration.
+#
+# This file only says how the process starts. Upstreams, credentials, keys,
+# models, routes, which features are on and site settings (such as the
+# public URL) live in the database; manage them in the console or with
+# `plugrelay apply`. plugrelay never writes this file.
+#
+# Every field can be overridden by an environment variable, e.g.
+# PLUGRELAY_LISTEN, PLUGRELAY_STORE_DSN, PLUGRELAY_MASTER_KEY.
+
+# Address to listen on. Keep 127.0.0.1 unless a proxy or team needs access.
+listen: 127.0.0.1:8787
+
+# Reverse proxies (CIDRs or IPs) whose X-Forwarded-For / X-Real-IP name the
+# client. Empty: the TCP peer is the client and those headers are ignored.
+# List only your own proxies; a trusted peer can claim any client address.
+# trusted_proxies: [127.0.0.1, "::1"]
+
+# 32 random bytes, base64. Encrypts upstream credentials and secret
+# settings. `plugrelay init` generates one. Losing it makes stored
+# credentials unreadable. Use one of:
+# master_key: "base64..."
+master_key_file: master.key
+
+# Business database. sqlite (pure Go, single node), postgres or mysql.
+store:
+  driver: sqlite
+  dsn: plugrelay.db
+  # driver: postgres
+  # dsn: postgres://plugrelay:secret@127.0.0.1:5432/plugrelay?sslmode=disable
+  # driver: mysql
+  # dsn: plugrelay:secret@tcp(127.0.0.1:3306)/plugrelay
+
+# Shared runtime state: session bindings, cooldowns, concurrency counters.
+# memory: single node, lost on restart
+# sql:    single node, kept in the store database across restarts
+# redis:  required when more than one relay node serves traffic
+state:
+  driver: memory
+  # driver: redis
+  # url: redis://127.0.0.1:6379/0
+
+# Out-of-process plugins (JSON-RPC over stdio). Off unless enabled.
+external_plugins:
+  enabled: false
+  dir: plugins
+
+log:
+  level: info   # debug | info | warn | error
+  format: text  # text | json
+
+# Outbound traffic to upstreams.
+egress:
+  # Private and loopback addresses are blocked to prevent SSRF; allow
+  # specific ranges for self-hosted upstreams.
+  allow_private_cidrs: []
+  # - 10.0.0.0/8
+  default_timeouts:
+    first_byte: 2m  # until the first byte of the upstream response
+    idle: 5m        # between two chunks of a stream
+    total: 30m      # whole request
+
+limits:
+  max_body_bytes: 33554432          # 32 MiB request body as sent
+  max_decompressed_bytes: 134217728 # 128 MiB after gzip/zstd
+
+console:
+  # On by default.
+  # enabled: false
+
+native:
+  # /native/<upstream>/<path> forwards any request verbatim to an upstream
+  # (non-batch files, fine-tuning, vendor-only APIs). Off by default; when
+  # on, each key also needs the middleware.access setting native_upstreams.
+  enabled: false
+  # max_body_bytes: 536870912 # 512 MiB per request body

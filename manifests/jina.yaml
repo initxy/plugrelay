@@ -1,0 +1,33 @@
+# Checked 2026-11 against the vendor's docs (jina.ai refuses automated
+# reads; these are Jina's own published references):
+#   https://raw.githubusercontent.com/jina-ai/meta-prompt/main/v1.txt
+#   https://github.com/jina-ai/jina-on-prem/wiki/API-Reference
+#   https://github.com/jina-ai/node-DeepResearch
+# One key covers every Jina product. Embeddings take Jina's extra `task`
+# (retrieval.query, retrieval.passage, ...), passed through as is.
+id: jina
+kind: provider
+name: Jina AI
+category: vendor
+homepage: https://jina.ai
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+endpoints:
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: https://api.jina.ai/v1
+  # POST /v1/rerank; return_documents defaults to true here.
+  - protocol: rerank
+    base_url: https://api.jina.ai/v1
+  # DeepSearch (model jina-deepsearch-v1) only; its thinking arrives inside
+  # content as <think> tags, not a reasoning field.
+  - id: chat
+    protocol: openai-chat
+    base_url: https://deepsearch.jina.ai/v1
+    capabilities:
+      freeform_tools: false
+      reasoning: false

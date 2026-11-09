@@ -1,0 +1,40 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.infini-ai.com/gen-studio/api/get-started/
+#   https://docs.infini-ai.com/gen-studio/api/usage-and-billing/error-codes-llm.html
+id: infini-ai
+kind: provider
+name: Infini-AI GenStudio
+name_zh: "无问芯穹"
+category: inference
+homepage: https://docs.infini-ai.com/gen-studio/
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://cloud.infini-ai.com/maas/v1
+    interpreter: openai-compatible
+    capabilities:
+      freeform_tools: false
+      reasoning: reasoning_content
+  - protocol: anthropic
+    base_url: https://cloud.infini-ai.com/maas
+    interpreter: anthropic-compatible
+    auth:
+      header: x-api-key
+      scheme: raw
+    capabilities:
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+errors:
+  # Balance (10017) and the key's budget cap (10024).
+  - when: {code: "10017"}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: "10024"}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: model_not_ready}
+    verdict: {cause: transient, credential: keep, retry: next}

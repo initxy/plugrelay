@@ -1,0 +1,1 @@
+{"id":"rerank-fae51b2b","model":"BAAI/bge-reranker-base","usage":{"total_tokens":56},"results":[{"index":1,"document":{"text":"Paris is the capital of France."},"relevance_score":0.99853515625},{"index":0,"document":{"text":"Berlin is in Germany."},"relevance_score":0.0005860328674316406}]}

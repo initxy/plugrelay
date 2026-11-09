@@ -1,0 +1,26 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://platform.baichuan-ai.com/docs-v2/guide
+#   https://platform.baichuan-ai.com/docs-v2/errorCode
+id: baichuan
+kind: provider
+name: Baichuan AI
+name_zh: "百川智能"
+category: vendor
+homepage: https://platform.baichuan-ai.com/docs-v2/guide
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api.baichuan-ai.com/v1
+    capabilities:
+      freeform_tools: false
+errors:
+  # Insufficient balance shares 429 with rate limiting.
+  - when: {status: 429, message_contains: "Insufficient account balance"}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}

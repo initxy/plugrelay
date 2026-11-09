@@ -1,0 +1,42 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.cohere.com/docs/compatibility-api
+#   https://docs.cohere.com/reference/errors
+#   https://docs.cohere.com/reference/embed
+#   https://docs.cohere.com/reference/rerank
+id: cohere
+kind: provider
+name: Cohere (Compatibility API)
+name_zh: "Cohere（兼容接口）"
+category: vendor
+homepage: https://docs.cohere.com/docs/compatibility-api
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+  max_tokens_field: max_tokens
+  unsupported_params: [store, metadata, logit_bias, top_logprobs, n, modalities, prediction, audio, service_tier, parallel_tool_calls]
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api.cohere.ai/compatibility/v1
+    capabilities:
+      freeform_tools: false
+  # Takes model, input and encoding_format only: no dimensions or
+  # input_type.
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: https://api.cohere.ai/compatibility/v1
+  # Transcriptions only (language is required, json output only); no
+  # translations or speech.
+  - id: audio
+    protocol: openai-audio
+    base_url: https://api.cohere.ai/compatibility/v1
+    capabilities:
+      speech: false
+  # Native v2 rerank (strings only, no documents in the results); the
+  # compatibility API has none.
+  - id: rerank
+    protocol: cohere-rerank
+    base_url: https://api.cohere.com/v2

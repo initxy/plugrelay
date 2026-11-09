@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "plugrelay": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "plugrelay",
+      "options": {
+        "baseURL": "http://127.0.0.1:8787/v1",
+        "apiKey": "pr_testkey"
+      },
+      "models": {
+        "gpt-5.5": {
+          "name": "gpt-5.5"
+        }
+      }
+    }
+  },
+  "model": "plugrelay/gpt-5.5"
+}

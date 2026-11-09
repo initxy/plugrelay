@@ -1,0 +1,236 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://plugrelay.dev/schemas/provider-manifest.json",
+  "title": "plugrelay provider manifest",
+  "description": "Declarative upstream description interpreted by a generic provider plugin. Cross-field rules (placeholders, interpreter/protocol pairs, hard rules on verdicts) are enforced by the loader.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "kind", "endpoints", "auth"],
+  "properties": {
+    "id": {"$ref": "#/$defs/id"},
+    "kind": {"const": "provider"},
+    "name": {"type": "string"},
+    "name_zh": {"type": "string", "description": "Name shown in the Chinese console; name otherwise."},
+    "category": {"enum": ["vendor", "cloud", "inference", "gateway", "self_hosted", "custom"], "description": "Group in the console's add-upstream gallery."},
+    "homepage": {"$ref": "#/$defs/httpURL"},
+    "interpreter": {"$ref": "#/$defs/interpreter"},
+    "variables": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[a-z_][a-z0-9_]*$", "not": {"enum": ["model", "manifest", "issuer"]}},
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "default": {"type": "string"},
+          "required": {"type": "boolean"},
+          "description": {"type": "string"},
+          "description_zh": {"type": "string"}
+        }
+      }
+    },
+    "endpoints": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/endpoint"}},
+    "auth": {"$ref": "#/$defs/auth"},
+    "owned_headers": {"type": "array", "items": {"$ref": "#/$defs/headerName"}},
+    "extra_headers": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/headerName"},
+      "additionalProperties": {"type": "string"}
+    },
+    "credential_headers": {
+      "description": "Header name → Credential.Meta key whose value is sent in it.",
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/headerName"},
+      "additionalProperties": {"type": "string", "minLength": 1}
+    },
+    "capabilities": {"$ref": "#/$defs/capabilities"},
+    "errors": {"type": "array", "items": {"$ref": "#/$defs/errorRule"}},
+    "models": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "list": {"type": "string", "pattern": "^/"},
+        "endpoint": {"type": "string"},
+        "static": {"type": "array", "items": {"$ref": "#/$defs/model"}}
+      },
+      "not": {"required": ["list", "static"]}
+    },
+    "pricing": {
+      "oneOf": [
+        {"type": "string", "description": "Path of a pricing file relative to the manifest."},
+        {"$ref": "#/$defs/pricing"}
+      ]
+    },
+    "quota": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {
+        "endpoint": {"type": "string"},
+        "method": {"enum": ["GET", "POST"]},
+        "path": {"type": "string", "pattern": "^/"},
+        "remaining": {"type": "string"},
+        "limit": {"type": "string"},
+        "remaining_fraction": {"type": "string"},
+        "reset": {"type": "string"},
+        "reset_period": {"type": "string"}
+      },
+      "anyOf": [{"required": ["remaining_fraction"]}, {"required": ["remaining", "limit"]}]
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$"},
+    "httpURL": {"type": "string", "pattern": "^https?://[^/]+"},
+    "headerName": {"type": "string", "pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$"},
+    "interpreter": {"enum": ["openai-compatible", "anthropic-compatible", "gemini", "openai", "anthropic", "bedrock", "vertex"]},
+    "protocol": {"enum": ["anthropic", "openai-chat", "openai-responses", "openai-completions", "gemini", "openai-embeddings", "openai-images", "openai-audio", "gemini-embeddings", "rerank", "cohere-rerank", "tei-rerank"]},
+    "signal": {
+      "enum": ["invalid_request", "context_too_long", "authentication", "permission", "not_found", "rate_limited",
+               "quota_exhausted", "overloaded", "content_filtered", "capability_missing", "timeout", "internal", "upstream"]
+    },
+    "duration": {"type": "string", "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$"},
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "header": {"$ref": "#/$defs/headerName"},
+        "scheme": {"enum": ["Bearer", "raw"]},
+        "query_param": {"type": "string", "minLength": 1},
+        "key_optional": {"type": "boolean", "description": "The server may run without a key: an upstream with no credentials is routed with no auth. Manifest-level auth only."}
+      },
+      "oneOf": [{"required": ["header"]}, {"required": ["query_param"]}]
+    },
+    "endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocol", "base_url"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "protocol": {"$ref": "#/$defs/protocol"},
+        "base_url": {
+          "description": "http(s) URL; may contain {variable} placeholders and must not end with /.",
+          "type": "string",
+          "pattern": "^(https?://[^/]+|\\{[a-z_][a-z0-9_]*\\}).*[^/]$"
+        },
+        "interpreter": {"$ref": "#/$defs/interpreter"},
+        "path": {"type": "string", "pattern": "^/"},
+        "query": {"type": "object", "additionalProperties": {"type": "string"}},
+        "unsupported_betas": {"type": "array", "items": {"type": "string"}},
+        "capabilities": {"$ref": "#/$defs/capabilities"},
+        "issuer": {"$ref": "#/$defs/id"},
+        "auth": {"$ref": "#/$defs/auth", "not": {"required": ["key_optional"]}}
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cache": {"enum": ["explicit", "keyed", "implicit", "none"]},
+        "cache_1h": {"type": "boolean"},
+        "function_tools": {"type": "boolean"},
+        "freeform_tools": {"type": "boolean"},
+        "server_tools": {"type": "array", "items": {"type": "string"}},
+        "deferred_tools": {"type": "boolean"},
+        "reasoning": {"oneOf": [{"type": "boolean"}, {"enum": ["effort", "budget", "reasoning_content"]}]},
+        "images": {"type": "boolean"},
+        "documents": {"type": "boolean"},
+        "tool_result_images": {"type": "boolean"},
+        "echo_fields": {"type": "array", "items": {"type": "string"}},
+        "server_state": {"type": "boolean"},
+        "compaction": {"type": "boolean"},
+        "max_context": {"type": "integer", "minimum": 0},
+        "max_tokens_field": {"type": "string"},
+        "unsupported_params": {"type": "array", "items": {"type": "string"}},
+        "fill_in_middle": {"type": "boolean"},
+        "embeddings": {"type": "boolean"},
+        "image_generation": {"type": "boolean"},
+        "image_edit": {"type": "boolean"},
+        "audio_transcription": {"type": "boolean"},
+        "speech": {"type": "boolean"},
+        "rerank": {"type": "boolean"},
+        "batches": {"type": "boolean"},
+        "realtime": {"type": "boolean"},
+        "responses_websocket": {"type": "boolean"}
+      }
+    },
+    "status": {"type": "integer", "minimum": 100, "maximum": 599},
+    "errorRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["when", "verdict"],
+      "properties": {
+        "when": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "status": {"$ref": "#/$defs/status"},
+            "status_in": {"type": "array", "items": {"$ref": "#/$defs/status"}},
+            "message_contains": {"type": "string", "minLength": 1},
+            "code": {"type": "string", "minLength": 1},
+            "header_present": {"$ref": "#/$defs/headerName"},
+            "signal": {"$ref": "#/$defs/signal"}
+          }
+        },
+        "verdict": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cause"],
+          "properties": {
+            "cause": {"enum": ["request", "transient", "rate_limit", "quota", "auth_expired", "banned", "content", "unknown"]},
+            "retry": {"enum": ["none", "next", "downgrade"]},
+            "credential": {"enum": ["keep", "cooldown", "cool_until_reset", "refresh", "quarantine", "manual"]},
+            "cooldown": {"$ref": "#/$defs/duration"},
+            "model_scope": {"type": "boolean"},
+            "signal": {"$ref": "#/$defs/signal"},
+            "downgrade": {"type": "object", "description": "gjson path → replacement value, for retry: downgrade."}
+          },
+          "allOf": [
+            {"if": {"properties": {"cause": {"const": "content"}}}, "then": {"properties": {"retry": {"const": "none"}}}},
+            {"if": {"properties": {"cause": {"enum": ["banned", "unknown"]}}},
+             "then": {"properties": {"retry": {"const": "none"}, "credential": {"enum": ["quarantine", "manual"]}}}},
+            {"if": {"properties": {"cause": {"enum": ["request", "transient"]}}},
+             "then": {"properties": {"credential": {"const": "keep"}}}}
+          ]
+        }
+      }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "display_name": {"type": "string"},
+        "owned_by": {"type": "string"},
+        "context_window": {"type": "integer", "minimum": 0},
+        "max_output": {"type": "integer", "minimum": 0},
+        "tools": {"type": "boolean"},
+        "vision": {"type": "boolean"},
+        "reasoning": {"type": "boolean"},
+        "efforts": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "price": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input", "output"],
+      "properties": {
+        "input": {"type": "number", "minimum": 0},
+        "cache_read": {"type": "number", "minimum": 0},
+        "cache_write_5m": {"type": "number", "minimum": 0},
+        "cache_write_1h": {"type": "number", "minimum": 0},
+        "output": {"type": "number", "minimum": 0},
+        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"}
+      }
+    },
+    "pricing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["models"],
+      "properties": {
+        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+        "models": {"type": "object", "additionalProperties": {"$ref": "#/$defs/price"}}
+      }
+    }
+  }
+}

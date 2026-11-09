@@ -1,0 +1,27 @@
+# Build output
+/bin/
+/dist/
+*.test
+*.out
+coverage.*
+
+# Runtime data
+/data/
+*.db
+*.db-*
+relay.yaml
+!examples/relay.yaml
+
+# Console
+web/node_modules/
+web/dist/*
+!web/dist/index.html
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+
+
+# Compose secrets (holds the master key)
+deploy/.env

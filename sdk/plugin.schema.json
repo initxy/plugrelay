@@ -1,0 +1,350 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://plugrelay.dev/schema/plugin.schema.json",
+  "title": "plugrelay external plugin manifest (plugin.yaml)",
+  "description": "See sdk/PROTOCOL.md section 8. The Go loader (internal/extplugin) is authoritative and checks cross-field rules this schema cannot express.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "version",
+    "points",
+    "command"
+  ],
+  "oneOf": [
+    {
+      "required": [
+        "kind"
+      ],
+      "not": {
+        "required": [
+          "kinds"
+        ]
+      }
+    },
+    {
+      "required": [
+        "kinds"
+      ],
+      "not": {
+        "required": [
+          "kind"
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "duration": {
+      "type": "string",
+      "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$",
+      "description": "Go duration, e.g. 500ms, 10s, 1h"
+    },
+    "kind": {
+      "enum": [
+        "provider",
+        "auth",
+        "middleware",
+        "selector",
+        "meter",
+        "sink",
+        "job",
+        "admin"
+      ]
+    },
+    "point": {
+      "enum": [
+        "auth.authenticate",
+        "middleware.onRequest",
+        "middleware.onAttempt",
+        "middleware.onFinish",
+        "selector.rank",
+        "meter.reserve",
+        "meter.settle",
+        "meter.refund",
+        "sink.consume",
+        "job.run",
+        "admin.handle",
+        "provider.endpoints",
+        "provider.prepare",
+        "provider.send",
+        "provider.classify",
+        "provider.listModels",
+        "provider.refresh",
+        "provider.quota"
+      ]
+    }
+  },
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,62}$",
+      "description": "Bare name; the core sees <kind>.<id>."
+    },
+    "name": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "kind": {
+      "$ref": "#/$defs/kind"
+    },
+    "kinds": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/kind"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "points": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/point"
+      },
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Protocol methods implemented. middleware.onEvent is not offered to external plugins."
+    },
+    "command": {
+      "type": "string",
+      "minLength": 1
+    },
+    "args": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "env": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^(?!PLUGRELAY_)[A-Za-z_][A-Za-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "transport": {
+      "enum": [
+        "stdio",
+        "unix"
+      ],
+      "default": "stdio"
+    },
+    "timeouts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "startup": {
+          "$ref": "#/$defs/duration",
+          "default": "10s"
+        },
+        "call": {
+          "$ref": "#/$defs/duration",
+          "default": "5s"
+        },
+        "send": {
+          "$ref": "#/$defs/duration",
+          "default": "10m"
+        },
+        "shutdown": {
+          "$ref": "#/$defs/duration",
+          "default": "5s"
+        },
+        "methods": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/point"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/duration"
+          }
+        }
+      }
+    },
+    "max_concurrency": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 16
+    },
+    "fail_policy": {
+      "enum": [
+        "open",
+        "closed"
+      ]
+    },
+    "request_body": {
+      "type": "boolean",
+      "default": false
+    },
+    "reports_off_box": {
+      "description": "The plugin sends data off the box (traces, telemetry, log shipping); test mode never runs it.",
+      "type": "boolean",
+      "default": false
+    },
+    "requires": {
+      "description": "Plugin ids this plugin cannot work without; the core enables them with it.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "settings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_.]{0,63}$"
+          },
+          "type": {
+            "enum": [
+              "string",
+              "int",
+              "float",
+              "bool",
+              "duration",
+              "list",
+              "secret",
+              "model",
+              "upstream",
+              "group",
+              "json"
+            ],
+            "default": "string"
+          },
+          "default": {},
+          "scopes": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "global",
+                "group",
+                "user",
+                "key"
+              ]
+            },
+            "uniqueItems": true
+          },
+          "merge": {
+            "enum": [
+              "override",
+              "strictest",
+              "union"
+            ],
+            "default": "override"
+          },
+          "description": {
+            "type": "string"
+          },
+          "restart": {
+            "type": "boolean"
+          },
+          "enum": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "key"
+        ]
+      }
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "log",
+              "kv",
+              "http"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "network": {
+          "type": "string"
+        },
+        "files": {
+          "type": "string"
+        }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "owned_headers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "issuer": {
+          "type": "string"
+        }
+      }
+    },
+    "job": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "every": {
+          "$ref": "#/$defs/duration"
+        }
+      },
+      "required": [
+        "every"
+      ]
+    },
+    "admin": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "routes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "method": {
+                "type": "string",
+                "default": "GET"
+              },
+              "path": {
+                "type": "string",
+                "pattern": "^/"
+              },
+              "role": {
+                "enum": [
+                  "",
+                  "admin",
+                  "member"
+                ]
+              }
+            },
+            "required": [
+              "path"
+            ]
+          }
+        }
+      },
+      "required": [
+        "routes"
+      ]
+    }
+  }
+}

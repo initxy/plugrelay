@@ -1,0 +1,60 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://github.com/openvinotoolkit/model_server/tree/main/docs
+#   https://github.com/openvinotoolkit/model_server/blob/main/src/http_rest_api_handler.cpp
+#   https://github.com/openvinotoolkit/model_server/blob/main/docs/model_server_rest_api_rerank.md
+# Generative routes sit under /v3 (/v1 is accepted too). --rest_port has no
+# default; the docs use 8000. Completions reject suffix.
+id: openvino-model-server
+kind: provider
+name: OpenVINO Model Server
+category: self_hosted
+homepage: https://docs.openvino.ai/nightly/model-server/ovms_what_is_openvino_model_server.html
+interpreter: openai-compatible
+variables:
+  base_url:
+    default: http://localhost:8000/v3
+    description: OpenAI-compatible base URL of the server, including /v3.
+    description_zh: "服务的 OpenAI 兼容地址，带 /v3。"
+# Runs without a key unless started with --api_key_file; an empty
+# credential secret sends no Authorization header.
+auth:
+  key_optional: true
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+  max_tokens_field: max_completion_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: "{base_url}"
+    capabilities:
+      freeform_tools: false
+      reasoning: reasoning_content
+  - id: responses
+    protocol: openai-responses
+    base_url: "{base_url}"
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  - id: completions
+    protocol: openai-completions
+    base_url: "{base_url}"
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: "{base_url}"
+  - id: images
+    protocol: openai-images
+    base_url: "{base_url}"
+  - id: audio
+    protocol: openai-audio
+    base_url: "{base_url}"
+  # POST /v3/rerank (Cohere-v1 based): string documents only, {text}
+  # objects are refused; no usage in the response.
+  - protocol: rerank
+    base_url: "{base_url}"
+models:
+  list: /models

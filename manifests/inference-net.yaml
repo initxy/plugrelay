@@ -1,0 +1,33 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.inference.net/api/api-quickstart
+#   https://docs.inference.net/api/anthropic-sdk
+#   https://docs.inference.net/api/reasoning
+# The Anthropic route takes the key as a Bearer token, not x-api-key.
+id: inference-net
+kind: provider
+name: Inference.net
+category: inference
+homepage: https://docs.inference.net
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api.inference.net/v1
+    interpreter: openai-compatible
+    capabilities:
+      freeform_tools: false
+      reasoning: reasoning_content
+  - protocol: anthropic
+    base_url: https://api.inference.net
+    interpreter: anthropic-compatible
+    capabilities:
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+models:
+  list: /models

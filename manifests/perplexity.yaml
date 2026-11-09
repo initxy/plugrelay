@@ -1,0 +1,29 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.perplexity.ai/docs/agent-api/openai-compatibility
+#   https://docs.perplexity.ai/guides/chat-completions-guide
+#   https://docs.perplexity.ai/docs/admin/rate-limits-usage-tiers
+# Sonar chat completions reached end of support on 2026-09-27 and are
+# being moved onto the Agent API, so only that (Responses-shaped) route is
+# declared.
+id: perplexity
+kind: provider
+name: Perplexity (Agent API)
+name_zh: "Perplexity（Agent API）"
+category: vendor
+homepage: https://docs.perplexity.ai
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+endpoints:
+  - id: responses
+    protocol: openai-responses
+    base_url: https://api.perplexity.ai/v1
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+models:
+  list: /models

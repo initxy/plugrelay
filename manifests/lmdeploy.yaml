@@ -1,0 +1,56 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/openai/api_server.py
+#   https://github.com/InternLM/lmdeploy/tree/main/lmdeploy/serve/anthropic
+#   https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/openai/protocol.py
+# lmdeploy serve api_server; /v1/embeddings is not served by the TurboMind
+# engine, so it is not declared.
+id: lmdeploy
+kind: provider
+name: LMDeploy
+category: self_hosted
+homepage: https://lmdeploy.readthedocs.io
+interpreter: openai-compatible
+variables:
+  server_url:
+    default: http://localhost:23333
+    description: Root URL of the server, without /v1.
+    description_zh: "服务的根地址，不带 /v1。"
+# Runs without a key unless started with --api-keys, which checks
+# Authorization: Bearer only (also on the Anthropic route); an empty
+# credential secret sends no Authorization header.
+auth:
+  key_optional: true
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+  max_tokens_field: max_completion_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: "{server_url}/v1"
+    capabilities:
+      freeform_tools: false
+      reasoning: reasoning_content
+  - id: responses
+    protocol: openai-responses
+    base_url: "{server_url}/v1"
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  - id: completions
+    protocol: openai-completions
+    base_url: "{server_url}/v1"
+  - protocol: anthropic
+    base_url: "{server_url}"
+    interpreter: anthropic-compatible
+    capabilities:
+      cache: implicit
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+models:
+  list: /models

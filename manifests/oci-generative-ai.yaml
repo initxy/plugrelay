@@ -1,0 +1,45 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.oracle.com/en-us/iaas/Content/generative-ai/openai-compatible-api.htm
+#   https://docs.oracle.com/iaas/Content/generative-ai/api-keys.htm
+#   https://docs.oracle.com/iaas/Content/generative-ai/responses-api.htm
+# The credential is a Generative AI API key, usable with OpenAI SDKs in
+# eu-frankfurt-1, ap-hyderabad-1, ap-osaka-1, us-ashburn-1, us-chicago-1
+# and us-phoenix-1; the key must be in the model's region. Every call
+# names a Generative AI project: set the credential's meta key "project"
+# to its OCID.
+id: oci-generative-ai
+kind: provider
+name: Oracle OCI Generative AI
+name_zh: "Oracle OCI 生成式 AI"
+category: cloud
+homepage: https://docs.oracle.com/en-us/iaas/Content/generative-ai/home.htm
+interpreter: openai-compatible
+variables:
+  region:
+    default: us-chicago-1
+    description: OCI region of the key and model.
+    description_zh: "key 和模型所在的 OCI 区域。"
+auth:
+  header: Authorization
+  scheme: Bearer
+owned_headers: [OpenAI-Project]
+credential_headers:
+  OpenAI-Project: project
+capabilities:
+  cache: none
+endpoints:
+  # Responses is the primary interface; Meta models are chat only.
+  - id: responses
+    protocol: openai-responses
+    base_url: https://inference.generativeai.{region}.oci.oraclecloud.com/openai/v1
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  - id: chat
+    protocol: openai-chat
+    base_url: https://inference.generativeai.{region}.oci.oraclecloud.com/openai/v1
+    capabilities:
+      freeform_tools: false

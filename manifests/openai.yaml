@@ -1,0 +1,117 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://developers.openai.com/api/reference/overview
+#   https://developers.openai.com/api/docs/guides/batch
+#   https://developers.openai.com/api/docs/guides/error-codes
+#   https://developers.openai.com/api/docs/guides/voice-websockets
+#   https://developers.openai.com/api/docs/guides/websocket-mode
+# Batch targets per the guide: responses, chat, completions, embeddings,
+# moderations, images/generations, images/edits; only the first four are
+# declared here.
+id: openai
+kind: provider
+name: OpenAI
+category: vendor
+homepage: https://platform.openai.com/docs/api-reference
+interpreter: openai
+auth:
+  header: Authorization
+  scheme: Bearer
+# Organization and project select whose quota is billed: only the
+# credential's values (meta keys "organization" / "project") go out.
+owned_headers: [OpenAI-Organization, OpenAI-Project]
+credential_headers:
+  OpenAI-Organization: organization
+  OpenAI-Project: project
+capabilities:
+  # OpenAI serves custom (freeform) tools on chat and Responses.
+  freeform_tools: true
+  cache: keyed
+endpoints:
+  - id: responses
+    protocol: openai-responses
+    base_url: https://api.openai.com/v1
+    issuer: openai
+    capabilities:
+      batches: true
+      # wss://api.openai.com/v1/realtime?model=… and the Responses
+      # WebSocket mode on wss://api.openai.com/v1/responses.
+      realtime: true
+      responses_websocket: true
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api.openai.com/v1
+    issuer: openai
+    capabilities:
+      max_tokens_field: max_completion_tokens
+      batches: true
+  # Legacy text completions (instruct models); suffix is accepted.
+  - id: completions
+    protocol: openai-completions
+    base_url: https://api.openai.com/v1
+    issuer: openai
+    capabilities:
+      cache: implicit
+      fill_in_middle: true
+      batches: true
+  # Media operations: /embeddings, /images/generations and /images/edits,
+  # /audio/transcriptions, /audio/translations and /audio/speech.
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: https://api.openai.com/v1
+    issuer: openai
+    capabilities:
+      batches: true
+  - id: images
+    protocol: openai-images
+    base_url: https://api.openai.com/v1
+    issuer: openai
+  - id: audio
+    protocol: openai-audio
+    base_url: https://api.openai.com/v1
+    issuer: openai
+errors:
+  # Billing exhaustion arrives as 429 with error type insufficient_quota and
+  # one of several codes; it is not a rate limit.
+  - when: {signal: quota_exhausted}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+models:
+  list: /models
+# Standard-tier list prices, USD per million tokens, from
+# https://developers.openai.com/api/docs/pricing as read on 2026-11-05.
+# Models with a long-context tier are priced at the short tier (<= 272K
+# input tokens); longer prompts cost more. Where a 30-minute cache-write
+# price is listed it fills cache_write_5m (the bucket OpenAI usage lands
+# in); the 12-hour write price is left out. Pro models list no cached-input
+# price, so cache_read is left empty. gpt-5.6-sol is at a promotional price
+# until 2026-11-30. o4-mini and gpt-4.1-nano are not on the page.
+pricing:
+  currency: USD
+  models:
+    gpt-6-astra:   {input: 10, cache_read: 1, cache_write_5m: 12.5, output: 50}
+    gpt-6.1-sol:   {input: 2, cache_read: 0.1, cache_write_5m: 2.5, output: 10}
+    gpt-6.1-terra: {input: 1, cache_read: 0.05, cache_write_5m: 1.25, output: 5}
+    gpt-6-sol:     {input: 2, cache_read: 0.2, cache_write_5m: 2.5, output: 10}
+    gpt-6-luna:    {input: 0.1, cache_read: 0.01, cache_write_5m: 0.125, output: 0.5}
+    gpt-5.6-sol:   {input: 4, cache_read: 0.4, cache_write_5m: 5, output: 20}
+    gpt-5.6-terra: {input: 2, cache_read: 0.2, cache_write_5m: 2.5, output: 12}
+    gpt-5.6-luna:  {input: 0.2, cache_read: 0.02, cache_write_5m: 0.25, output: 1.2}
+    gpt-5.5:       {input: 5, cache_read: 0.5, output: 30}
+    gpt-5.5-pro:   {input: 30, output: 180}
+    gpt-5.4:       {input: 2.5, cache_read: 0.25, output: 15}
+    gpt-5.4-pro:   {input: 30, output: 180}
+    gpt-5.4-mini:  {input: 0.75, cache_read: 0.075, output: 4.5}
+    gpt-5.4-nano:  {input: 0.2, cache_read: 0.02, output: 1.25}
+    gpt-5.3-codex: {input: 1.75, cache_read: 0.175, output: 14}
+    gpt-5.2:       {input: 1.75, cache_read: 0.175, output: 14}
+    gpt-5.2-pro:   {input: 21, output: 168}
+    gpt-5.1:       {input: 1.25, cache_read: 0.125, output: 10}
+    gpt-5:         {input: 1.25, cache_read: 0.125, output: 10}
+    gpt-5-mini:    {input: 0.25, cache_read: 0.025, output: 2}
+    gpt-5-nano:    {input: 0.05, cache_read: 0.005, output: 0.4}
+    gpt-5-pro:     {input: 15, output: 120}
+    gpt-4.1:       {input: 2, cache_read: 0.5, output: 8}
+    gpt-4.1-mini:  {input: 0.4, cache_read: 0.1, output: 1.6}
+    gpt-4o:        {input: 2.5, cache_read: 1.25, output: 10}
+    gpt-4o-mini:   {input: 0.15, cache_read: 0.075, output: 0.6}
+    o3:            {input: 2, cache_read: 0.5, output: 8}
+    o3-pro:        {input: 20, output: 80}

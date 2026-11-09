@@ -1,0 +1,28 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.ai21.com/reference/jamba-1-6-api-ref
+#   https://docs.ai21.com/reference/jamba-api-response
+# The native chat API has the OpenAI chat request and stream shape.
+id: ai21
+kind: provider
+name: AI21 Labs (Jamba)
+name_zh: "AI21 Labs（Jamba）"
+category: vendor
+homepage: https://docs.ai21.com
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api.ai21.com/studio/v1
+    capabilities:
+      freeform_tools: false
+      reasoning: false
+models:
+  static:
+    - {id: jamba-large}
+    - {id: jamba-mini}

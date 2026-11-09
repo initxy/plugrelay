@@ -1,0 +1,23 @@
+name: Bug report
+description: Something works differently through plugrelay than directly against the upstream
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Before pasting logs or config, remove API keys, credentials and private URLs (platform `pr_` keys, upstream keys, tokens, internal hostnames).
+  - type: input
+    id: version
+    attributes: {label: plugrelay version, placeholder: "plugrelay version"}
+    validations: {required: true}
+  - type: input
+    id: client
+    attributes: {label: Client and version, placeholder: "e.g. a coding CLI 2.1.x"}
+  - type: input
+    id: upstream
+    attributes: {label: Upstream (manifest id) and protocol}
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened vs. what you expected
+      description: Include the request id from the console's request log, the processing tier (passthrough / patch / convert) and the conversion diagnostic if shown.
+    validations: {required: true}

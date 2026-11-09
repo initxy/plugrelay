@@ -1,0 +1,49 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://huggingface.co/docs/inference-providers/index
+#   https://huggingface.co/docs/inference-providers/en/guides/responses-api
+#   https://huggingface.co/docs/inference-providers/integrations/claude-code
+# A model suffix picks the provider or policy: <repo>:<provider>,
+# :fastest (default), :cheapest. Responses is marked beta; the Anthropic
+# route is documented only in the Claude Code guide.
+id: huggingface
+kind: provider
+name: Hugging Face Inference Providers
+name_zh: "Hugging Face 推理服务"
+category: inference
+homepage: https://huggingface.co/docs/inference-providers
+auth:
+  header: Authorization
+  scheme: Bearer
+# Bills a Team or Enterprise org: only the credential's value (meta key
+# "bill_to") goes out.
+owned_headers: [X-HF-Bill-To]
+credential_headers:
+  X-HF-Bill-To: bill_to
+capabilities:
+  cache: none
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://router.huggingface.co/v1
+    interpreter: openai-compatible
+    capabilities:
+      freeform_tools: false
+  - id: responses
+    protocol: openai-responses
+    base_url: https://router.huggingface.co/v1
+    interpreter: openai-compatible
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  - protocol: anthropic
+    base_url: https://router.huggingface.co
+    interpreter: anthropic-compatible
+    capabilities:
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+models:
+  list: /models

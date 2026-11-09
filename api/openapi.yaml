@@ -1,0 +1,3868 @@
+openapi: 3.1.0
+info:
+  title: plugrelay admin API
+  version: 1.0.0
+  summary: The public management API of plugrelay.
+  description: |
+    This is the only API the bundled console uses; there are no console-only
+    endpoints. Anyone can build another front end against it.
+
+    **Authentication.** Browsers use the `pr_session` cookie set by
+    `POST /auth/login` (or `POST /setup`). Scripts send
+    `Authorization: Bearer <admin token>`. While the relay only listens on
+    loopback and the site setting `security.local_owner_login` is on (the
+    default), requests from 127.0.0.1 are treated as the local owner and
+    need no login (`GET /me` reports `auth: none`).
+
+    **CSRF.** Cookie-authenticated requests with an unsafe method must send the
+    `X-CSRF-Token` header with the value of the `pr_csrf` cookie
+    (double submit). Bearer-authenticated requests are exempt.
+
+    **Money.** Every amount is an integer number of micro-units (1/1,000,000)
+    of the currency named next to it, e.g. `{"micro": 197000, "currency": "CNY"}`
+    is ¥0.197. Token prices are per one million tokens. There are no ratios or
+    points anywhere in this API. The one exception is settings (features,
+    extensions, a group's, user's or key's layer): a setting with
+    `unit: money` is shown and taken in currency units of the site currency
+    (`1.5` is 1 500 000 micro-units), so a form never shows micro-units.
+
+    **Errors.** Non-2xx responses carry an `Error` body. Validation failures
+    list the offending fields so a form can point at them.
+
+    **Pagination.** Lists that can grow without bound (request logs, audit) use
+    an opaque time cursor: pass `next_cursor` back as `cursor`.
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+servers:
+  - url: /api/v1
+security:
+  - session: []
+  - bearer: []
+tags:
+  - name: setup
+    description: First-run wizard.
+  - name: auth
+    description: Login, logout and the current identity.
+  - name: overview
+    description: Aggregated numbers, quota windows and route status.
+  - name: keys
+    description: Platform keys and per-client connect snippets.
+  - name: users
+    description: Users and groups.
+  - name: upstreams
+    description: Upstreams, endpoints, manifests and tests. State is live router state.
+  - name: credentials
+    description: Upstream credentials. Secrets are write-only.
+  - name: models
+    description: Public models, their routes, and presets.
+  - name: pricing
+    description: Token prices in real money, and price suggestions from models.dev.
+  - name: public
+    description: Pages anyone may open while the public pages feature is on.
+  - name: logs
+    description: Request log with attempts, billing and diagnostics.
+  - name: features
+    description: |
+      What an operator switches on and off. A feature is one switch and one
+      settings form over built-in modules; its console pages show while it
+      is on. Extensions (external process plugins, Go plugins of a custom
+      build) are switched one by one. The settings of a group, user or key
+      layer live on that object.
+  - name: settings
+    description: Site settings, each tagged with how a change takes effect.
+  - name: mcp
+    description: Upstream MCP servers exposed through the relay's MCP gateway (/mcp). Secret headers are write-only.
+  - name: notifications
+    description: Where alerts go (email, Feishu/Lark, DingTalk, WeCom, webhook) and the log of what was sent. Channel secrets are write-only.
+  - name: audit
+    description: Who changed what.
+  - name: search
+    description: Global search.
+
+paths:
+  # ------------------------------------------------------------------ setup
+  /setup/status:
+    get:
+      tags: [setup]
+      operationId: getSetupStatus
+      summary: Whether the first-run wizard still has to run
+      security: []
+      responses:
+        "200":
+          description: Setup state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SetupStatus" }
+  /setup:
+    post:
+      tags: [setup]
+      operationId: runSetup
+      summary: Finish first-run setup
+      description: |
+        Only accepted while `needs_setup` is true. Creates the admin account,
+        stores the listen choice, applies the usage answer (`team` and `sell`
+        turn the local-owner rule off; `sell` also hides upstream names from
+        end users and turns on the `billing` feature), and logs the caller in.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetupRequest" }
+      responses:
+        "200":
+          description: Setup done; session cookies set.
+          headers:
+            Set-Cookie: { $ref: "#/components/headers/SessionCookie" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/Invalid" }
+
+  # ------------------------------------------------------------------ auth
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Log in
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: Logged in; session cookies set.
+          headers:
+            Set-Cookie: { $ref: "#/components/headers/SessionCookie" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        "202":
+          description: |
+            Password accepted; the account has two-step sign-in. No session
+            yet: the `pr_mfa` cookie (HttpOnly, 5 minutes) binds the pending
+            sign-in, finished with POST /auth/mfa.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MfaChallenge" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: "`captcha_required` or `captcha_failed` (after `security.login_captcha_after` failures from the address), or `password_login_disabled`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429": { $ref: "#/components/responses/TooMany" }
+        "503":
+          description: "`captcha_unavailable`: the captcha provider could not be asked; sign-in fails closed."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /auth/mfa:
+    get:
+      tags: [auth]
+      operationId: getPendingMfa
+      summary: The pending sign-in's second-step methods
+      description: Read by the login page after a password or single sign-on step; needs the `pr_mfa` cookie.
+      security: []
+      responses:
+        "200":
+          description: Methods the user can finish with.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [methods, return_to]
+                properties:
+                  methods: { type: array, items: { $ref: "#/components/schemas/MfaMethod" } }
+                  return_to: { type: string, description: "Where single sign-on was headed." }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [auth]
+      operationId: verifyMfa
+      summary: Finish a sign-in with the second factor
+      description: |
+        A TOTP code is good once (its 30-second step is spent on first use),
+        a recovery code once. Five answers per pending sign-in; wrong ones
+        count against the login limiter per address and per account.
+        Errors: `mfa_invalid`, `mfa_expired`, `rate_limited`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FactorInput" }
+      responses:
+        "200":
+          description: Signed in; session cookies set.
+          headers:
+            Set-Cookie: { $ref: "#/components/headers/SessionCookie" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooMany" }
+  /auth/passkey/options:
+    post:
+      tags: [auth]
+      operationId: passkeyOptions
+      summary: WebAuthn assertion options
+      description: |
+        `login`: passwordless sign-in with a discoverable passkey (user
+        verification required; refused while password sign-in is off).
+        `mfa`: the second step of a pending sign-in (`pr_mfa` cookie).
+        `reauth`: confirming it is you before a sensitive change (session).
+        The challenge is single-use and expires after 5 minutes. The RP ID
+        is the host of the public URL; team and sell relays without one get
+        409 `public_url_missing`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [purpose]
+              properties:
+                purpose: { type: string, enum: [login, mfa, reauth] }
+      responses:
+        "200":
+          description: PublicKeyCredentialRequestOptions (binary fields base64url).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PasskeyRequestOptions" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooMany" }
+  /auth/passkey:
+    post:
+      tags: [auth]
+      operationId: passkeyLogin
+      summary: Sign in with a passkey alone
+      description: Checks origin, RP ID hash, user presence and verification, the signature and that the signature counter grew (a counter that goes back is refused as a possible cloned authenticator).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [credential]
+              properties:
+                credential: { $ref: "#/components/schemas/PasskeyCredential" }
+      responses:
+        "200":
+          description: Signed in; session cookies set.
+          headers:
+            Set-Cookie: { $ref: "#/components/headers/SessionCookie" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooMany" }
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: Log out
+      responses:
+        "204": { description: "Session ended." }
+  /me:
+    get:
+      tags: [auth]
+      operationId: getMe
+      summary: Who is calling, with which permissions
+      responses:
+        "200":
+          description: The caller.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /me/security:
+    get:
+      tags: [auth]
+      operationId: getSecurity
+      summary: The caller's sign-in methods
+      responses:
+        "200":
+          description: Two-step sign-in state and passkeys.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SecurityStatus" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /me/reauth:
+    post:
+      tags: [auth]
+      operationId: reauth
+      summary: Confirm it is you
+      description: |
+        Opens a 5-minute window for sensitive changes (turning off the
+        authenticator app, new recovery codes, adding or deleting a passkey),
+        which otherwise answer 403 `reauth_required`. Signing in opens the
+        same window. Accepts the password, a TOTP or recovery code, or a
+        passkey assertion (purpose `reauth`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FactorInput" }
+      responses:
+        "200":
+          description: Confirmed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [until]
+                properties:
+                  until: { type: string, format: date-time }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooMany" }
+  /me/totp/setup:
+    post:
+      tags: [auth]
+      operationId: setupTotp
+      summary: Start authenticator-app enrollment
+      description: A new secret, kept (sealed) for 15 minutes until confirmed with POST /me/totp. Needs a recent sign-in or re-authentication.
+      responses:
+        "200":
+          description: Secret and otpauth URI for the QR code.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [secret, otpauth_uri, expires_at]
+                properties:
+                  secret: { type: string, description: "Base32, for typing in by hand." }
+                  otpauth_uri: { type: string }
+                  expires_at: { type: string, format: date-time }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /me/totp:
+    post:
+      tags: [auth]
+      operationId: enableTotp
+      summary: Confirm authenticator-app enrollment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+      responses:
+        "200":
+          description: Turned on; ten new recovery codes, shown once.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RecoveryCodes" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/Invalid" }
+    delete:
+      tags: [auth]
+      operationId: disableTotp
+      summary: Turn off the authenticator app
+      description: Needs a recent re-authentication. Recovery codes go too unless a passkey remains.
+      responses:
+        "204": { description: "Turned off." }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /me/recovery-codes:
+    post:
+      tags: [auth]
+      operationId: regenerateRecoveryCodes
+      summary: Replace the recovery codes
+      responses:
+        "200":
+          description: Ten new codes; the old ones stop working.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RecoveryCodes" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /me/password:
+    post:
+      tags: [auth]
+      operationId: changeOwnPassword
+      summary: Set the caller's own password
+      description: Needs a recent re-authentication (403 `reauth_required`), which asks for the current password when the account has one.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string, minLength: 10 }
+      responses:
+        "204": { description: Changed. }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/Invalid" }
+  /me/passkeys/options:
+    post:
+      tags: [auth]
+      operationId: passkeyRegisterOptions
+      summary: WebAuthn creation options for a new passkey
+      description: Attestation `none`, ES256/EdDSA/RS256, resident key and user verification preferred; existing passkeys are excluded.
+      responses:
+        "200":
+          description: PublicKeyCredentialCreationOptions (binary fields base64url).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PasskeyCreationOptions" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /me/passkeys:
+    post:
+      tags: [auth]
+      operationId: registerPasskey
+      summary: Register a passkey
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [credential]
+              properties:
+                name: { type: string, maxLength: 64 }
+                credential: { $ref: "#/components/schemas/PasskeyCredential" }
+      responses:
+        "201":
+          description: Registered. The first factor of an account also brings recovery codes, shown once.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [passkey]
+                properties:
+                  passkey: { $ref: "#/components/schemas/Passkey" }
+                  recovery_codes: { type: array, items: { type: string } }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/Invalid" }
+  /me/passkeys/{id}:
+    patch:
+      tags: [auth]
+      operationId: renamePasskey
+      summary: Rename a passkey
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 64 }
+      responses:
+        "204": { description: "Renamed." }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [auth]
+      operationId: deletePasskey
+      summary: Delete a passkey
+      description: Needs a recent re-authentication.
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "204": { description: "Deleted." }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /auth/providers:
+    get:
+      tags: [auth]
+      operationId: listAuthProviders
+      summary: Sign-in methods the login page offers
+      security: []
+      responses:
+        "200":
+          description: Enabled single sign-on providers and whether password sign-in is on.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthProviders" }
+  /auth/sso/{id}/start:
+    get:
+      tags: [auth]
+      operationId: startSso
+      summary: Begin single sign-on (browser navigation)
+      description: |
+        Redirects to the identity provider with PKCE, state and nonce. The
+        pending sign-in is bound to the browser by the `pr_sso` cookie and
+        expires after 10 minutes. Errors redirect to `/login?sso_error=<code>`.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - { name: return_to, in: query, description: "Site-relative path to land on; anything else becomes /.", schema: { type: string } }
+      responses:
+        "302": { description: "To the identity provider, or back to the login page with sso_error." }
+  /auth/sso/{id}/callback:
+    get:
+      tags: [auth]
+      operationId: ssoCallback
+      summary: Identity provider redirect target
+      description: |
+        Checks state (one-time, bound to the `pr_sso` cookie), redeems the
+        code, verifies the ID token (signature via JWKS, issuer, audience,
+        expiry, nonce) or reads the OAuth user profile, maps the identity to a
+        user and sets the same session cookies as password login. Redirects to
+        `return_to`, or to `/login?sso_error=<code>` with one of
+        state_mismatch, state_expired, state_replayed, denied, invalid_token,
+        provider_error, domain_not_allowed, tenant_not_allowed,
+        email_unverified, account_exists, no_account, account_disabled,
+        unknown_provider, public_url_missing, rate_limited.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - { name: code, in: query, schema: { type: string } }
+        - { name: state, in: query, schema: { type: string } }
+        - { name: error, in: query, schema: { type: string } }
+      responses:
+        "302":
+          description: Signed in (session cookies set) or refused.
+          headers:
+            Set-Cookie: { $ref: "#/components/headers/SessionCookie" }
+
+  # ------------------------------------------------------------------ overview
+  /overview:
+    get:
+      tags: [overview]
+      operationId: getOverview
+      summary: Headline numbers for one time range
+      description: Read from pre-aggregated tables. Admins see the whole relay unless `key_id` or `user_id` narrows it; end users always see their own.
+      parameters:
+        - $ref: "#/components/parameters/Range"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+        - { name: key_id, in: query, schema: { type: string } }
+        - { name: user_id, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Overview stats.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Overview" }
+  /usage/timeseries:
+    get:
+      tags: [overview]
+      operationId: getUsageTimeseries
+      summary: Get usage timeseries
+      parameters:
+        - $ref: "#/components/parameters/Range"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+        - name: metric
+          in: query
+          schema: { type: string, enum: [spend, requests, tokens, cache_hit_rate], default: spend }
+        - name: group_by
+          in: query
+          schema: { type: string, enum: [none, model, key, upstream, user, client], default: model }
+        - name: bucket
+          in: query
+          description: "hour = hourly buckets whatever the range (the weekday × hour heatmap); default depends on the range."
+          schema: { type: string, enum: [hour] }
+        - { name: key_id, in: query, schema: { type: string } }
+        - { name: user_id, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Bucketed series. With group_by=client the label of client `other` is empty.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Timeseries" }
+  /usage/top:
+    get:
+      tags: [overview]
+      operationId: getUsageTop
+      summary: Models, keys, users or clients ranked by spend
+      description: End users only see their own usage. Spend, tokens and cache hit come from the hourly roll-ups; the p95 first-token time from the successful requests in the log.
+      parameters:
+        - $ref: "#/components/parameters/Range"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+        - name: by
+          in: query
+          required: true
+          schema: { type: string, enum: [model, key, user, client] }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 10 } }
+        - { name: key_id, in: query, schema: { type: string } }
+        - { name: user_id, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Rows, most spend first.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UsageTop" }
+  /usage/failures:
+    get:
+      tags: [overview]
+      operationId: getUsageFailures
+      summary: Failed requests over time by final cause
+      description: "Buckets as /usage/timeseries. Causes are the attempt causes plus not_sent (refused before any upstream was tried); series are ordered by their total, every bucket present."
+      parameters:
+        - $ref: "#/components/parameters/Range"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+        - { name: key_id, in: query, schema: { type: string } }
+        - { name: user_id, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: One series per cause.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UsageFailures" }
+  /clients:
+    get:
+      tags: [logs]
+      operationId: listClients
+      summary: Client programs the relay recognises in requests
+      responses:
+        "200":
+          description: Every known client in detection order, then other (empty name). A key's allowed clients are any of these ids but other.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name]
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+  /quota:
+    get:
+      tags: [overview]
+      operationId: getQuota
+      summary: Quota windows that apply to the caller (or to one key)
+      parameters:
+        - { name: key_id, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Windows side by side.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [windows]
+                properties:
+                  windows:
+                    type: array
+                    items: { $ref: "#/components/schemas/QuotaWindow" }
+  /status:
+    get:
+      tags: [overview]
+      operationId: getStatus
+      summary: Route status per model, as end users see it
+      responses:
+        "200":
+          description: Per-model status.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StatusPage" }
+  /public/catalog:
+    get:
+      tags: [public]
+      operationId: getPublicCatalog
+      summary: Public models-and-prices page
+      description: No sign-in. 404 `public_pages_off` while the public pages feature is off; answers are reused for a minute; loads are limited per address (429).
+      security: []
+      responses:
+        "200":
+          description: Catalog.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicCatalog" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooMany" }
+  /public/status:
+    get:
+      tags: [public]
+      operationId: getPublicStatus
+      summary: Public status page
+      description: No sign-in. 404 `public_pages_off` while the feature or its status page is off; cached and limited like the catalog.
+      security: []
+      responses:
+        "200":
+          description: Status.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicStatus" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooMany" }
+  /catalog:
+    get:
+      tags: [pricing]
+      operationId: getCatalog
+      summary: Models the caller may use, with effective prices
+      responses:
+        "200":
+          description: Catalog.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/CatalogEntry" }
+
+  # ------------------------------------------------------------------ keys
+  /keys:
+    get:
+      tags: [keys]
+      operationId: listKeys
+      summary: List keys
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: user_id, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { $ref: "#/components/schemas/KeyStatus" } }
+      responses:
+        "200":
+          description: Keys visible to the caller.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Key" }
+    post:
+      tags: [keys]
+      operationId: createKey
+      summary: Create key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/KeyInput" }
+      responses:
+        "201":
+          description: Created. `secret` is shown this one time only; the relay keeps a hash.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KeyCreated" }
+        "422": { $ref: "#/components/responses/Invalid" }
+  /keys/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [keys]
+      operationId: getKey
+      summary: Get key
+      responses:
+        "200":
+          description: One key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Key" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [keys]
+      operationId: updateKey
+      summary: Update key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/KeyPatch" }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Key" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/Invalid" }
+    delete:
+      tags: [keys]
+      operationId: deleteKey
+      summary: Delete key
+      responses:
+        "204": { description: "Revoked and deleted." }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /keys/{id}/rotate:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    post:
+      tags: [keys]
+      operationId: rotateKey
+      summary: Issue a new secret; the old one stops working at once
+      responses:
+        "200":
+          description: New secret, shown once.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KeyCreated" }
+  /keys/{id}/connect:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [keys]
+      operationId: getKeyConnect
+      summary: Per-client configuration for this key
+      description: |
+        The relay stores only a hash of the key, so snippets and the
+        `ccswitch://` link contain the literal placeholder `{{api_key}}`.
+        A client that holds the secret (right after creation) substitutes it;
+        otherwise it shows the placeholder and the user pastes their key.
+      parameters:
+        - name: os
+          in: query
+          schema: { $ref: "#/components/schemas/ClientOS" }
+      responses:
+        "200":
+          description: Snippets per client.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConnectInfo" }
+  /keys/{id}/settings:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [features]
+      operationId: getKeySettings
+      summary: The key's settings layer
+      description: Every setting of a core module, of a feature that is on, or of a running extension that may be placed on this layer, with its merged value. Settings that are fields of the key itself (a key's rpm, concurrency and budgets, a group's body logging) are not listed.
+      responses:
+        "200":
+          description: Settings.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LayerSettings" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [features]
+      operationId: putKeySettings
+      summary: Change settings on the key's layer
+      description: Only the settings named change; `null` removes one (a secret sent as `null` keeps its value).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [settings]
+              properties:
+                settings: { $ref: "#/components/schemas/SettingValues" }
+      responses:
+        "200":
+          description: Saved.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LayerSettings" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/Invalid" }
+  /keys/{id}/test:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    post:
+      tags: [keys]
+      operationId: testKey
+      summary: Send a tiny request through the relay with this key
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                client: { $ref: "#/components/schemas/ClientId" }
+                model: { type: string }
+      responses:
+        "200":
+          description: One result (also 200 when the test request failed; see `ok`).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TestOutcome" }
+  /playground:
+    post:
+      tags: [keys]
+      operationId: playground
+      summary: Talk to a model through the relay
+      description: >-
+        Sends the conversation as a real client request (logged, metered and billed like any other; the log shows it
+        as the playground) in the chosen client protocol, with one of the caller's keys. Admins may leave `key_id` out to talk as
+        themselves. The answer is a server-sent event stream: `start` (`request_id`), `text` and `reasoning` (`text`), then
+        one `done` (`ok`, `status`, `ttfb_ms`, `latency_ms`, `usage`, `error`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlaygroundRequest" }
+      responses:
+        "200":
+          description: Event stream.
+          content:
+            text/event-stream:
+              schema: { type: string }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/Invalid" }
+
+  # ------------------------------------------------------------------ users & groups
+  /users:
+    get:
+      tags: [users]
+      operationId: listUsers
+      summary: List users
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: group_id, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Users.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/User" } }
+    post:
+      tags: [users]
+      operationId: createUser
+      summary: Create user
+      description: Creating an admin needs a recent re-authentication of the calling session (403 `reauth_required`; see POST /me/reauth).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserInput" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Invalid" }
+  /users/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [users]
+      operationId: getUser
+      summary: Get user
+      responses:
+        "200":
+          description: One user.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [users]
+      operationId: updateUser
+      summary: Update user
+      description: Changing `password` or `role`, disabling the user, or re-enabling a disabled admin needs a recent re-authentication of the calling session (403 `reauth_required`; see POST /me/reauth). The login name (`username`, usually the email) cannot be changed; an `email` that differs from it is refused with 422.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserPatch" }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Invalid" }
+    delete:
+      tags: [users]
+      operationId: deleteUser
+      summary: Delete user
+      description: >-
+        Needs a recent re-authentication of the calling session (403 `reauth_required`; see POST /me/reauth).
+        Plugins first end what the user has running (a subscription a payment provider bills); when one cannot,
+        the deletion is refused with 409 `user_delete_blocked` naming the reason, and `force=true` deletes anyway
+        (the provider may keep billing; audited with `force`).
+      parameters:
+        - { name: force, in: query, required: false, schema: { type: boolean }, description: "Delete even when a plugin could not end what the user has running." }
+      responses:
+        "204": { description: "Deleted; the user's keys are revoked." }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /users/{id}/settings:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [features]
+      operationId: getUserSettings
+      summary: The user's settings layer
+      description: Every setting of a core module, of a feature that is on, or of a running extension that may be placed on this layer, with its merged value. Settings that are fields of the user itself (a key's rpm, concurrency and budgets, a group's body logging) are not listed.
+      responses:
+        "200":
+          description: Settings.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LayerSettings" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [features]
+      operationId: putUserSettings
+      summary: Change settings on the user's layer
+      description: Only the settings named change; `null` removes one (a secret sent as `null` keeps its value).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [settings]
+              properties:
+                settings: { $ref: "#/components/schemas/SettingValues" }
+      responses:
+        "200":
+          description: Saved.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LayerSettings" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/Invalid" }
+  /users/{id}/identities:
+    get:
+      tags: [users]
+      operationId: listUserIdentities
+      summary: Single sign-on identities linked to a user
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "200":
+          description: Linked identities.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Identity" } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /users/{id}/identities/{identity_id}:
+    delete:
+      tags: [users]
+      operationId: deleteUserIdentity
+      summary: Unlink a single sign-on identity
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - { name: identity_id, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: "Unlinked." }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /users/{id}/mfa:
+    delete:
+      tags: [users]
+      operationId: resetUserMfa
+      summary: Remove a user's two-step sign-in
+      description: Deletes the user's authenticator app, recovery codes and passkeys (audited as `user.mfa_reset`). Needs a recent re-authentication of the calling session (403 `reauth_required`). The CLI equivalent is `plugrelay user reset-2fa`.
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "204": { description: "Removed." }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /groups:
+    get:
+      tags: [users]
+      operationId: listGroups
+      summary: List groups
+      responses:
+        "200":
+          description: Groups.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Group" } }
+    post:
+      tags: [users]
+      operationId: createGroup
+      summary: Create group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GroupInput" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Group" }
+        "422": { $ref: "#/components/responses/Invalid" }
+  /groups/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    patch:
+      tags: [users]
+      operationId: updateGroup
+      summary: Update group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GroupInput" }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Group" }
+        "422": { $ref: "#/components/responses/Invalid" }
+    delete:
+      tags: [users]
+      operationId: deleteGroup
+      summary: Delete group
+      responses:
+        "204": { description: "Deleted." }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /groups/{id}/settings:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [features]
+      operationId: getGroupSettings
+      summary: The group's settings layer
+      description: Every setting of a core module, of a feature that is on, or of a running extension that may be placed on this layer, with its merged value. Settings that are fields of the group itself (a group's rpm, concurrency and budgets, a group's body logging) are not listed.
+      responses:
+        "200":
+          description: Settings.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LayerSettings" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [features]
+      operationId: putGroupSettings
+      summary: Change settings on the group's layer
+      description: Only the settings named change; `null` removes one (a secret sent as `null` keeps its value).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [settings]
+              properties:
+                settings: { $ref: "#/components/schemas/SettingValues" }
+      responses:
+        "200":
+          description: Saved.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LayerSettings" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/Invalid" }
+
+  # ------------------------------------------------------------------ upstreams
+  /upstreams:
+    get:
+      tags: [upstreams]
+      operationId: listUpstreams
+      summary: Upstreams with live router state
+      description: "`state` and each credential's `state` are read from the router at request time, never from a stored copy."
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Upstreams.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Upstream" } }
+    post:
+      tags: [upstreams]
+      operationId: createUpstream
+      summary: Create upstream
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpstreamInput" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Upstream" }
+        "422": { $ref: "#/components/responses/Invalid" }
+  /upstreams/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [upstreams]
+      operationId: getUpstream
+      summary: Get upstream
+      responses:
+        "200":
+          description: One upstream.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Upstream" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [upstreams]
+      operationId: updateUpstream
+      summary: Update upstream
+      description: Fields set here override the manifest on this site only; later manifest updates still apply to fields not overridden.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpstreamInput" }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Upstream" }
+        "422": { $ref: "#/components/responses/Invalid" }
+    delete:
+      tags: [upstreams]
+      operationId: deleteUpstream
+      summary: Delete upstream
+      responses:
+        "204": { description: "Deleted." }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /upstreams/{id}/test:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    post:
+      tags: [upstreams]
+      operationId: testUpstream
+      summary: Test upstream
+      description: "Tests the stored configuration, including changes made just before. Without `model`, it uses a model routed to the upstream, else the first chat model the upstream lists."
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TestRequest" }
+      responses:
+        "200":
+          description: One result per credential tested.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TestOutcome" }
+  /upstreams/{id}/remote-models:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [upstreams]
+      operationId: listRemoteModels
+      summary: Ask the upstream which models it serves
+      responses:
+        "200":
+          description: Remote model list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/ModelInfo" } }
+        "502": { $ref: "#/components/responses/UpstreamFailed" }
+  /manifests:
+    get:
+      tags: [upstreams]
+      operationId: listManifests
+      summary: Official and local upstream manifests available to create from
+      responses:
+        "200":
+          description: Manifests.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Manifest" } }
+
+  # ------------------------------------------------------------------ credentials
+  /upstreams/{id}/credentials:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [credentials]
+      operationId: listCredentials
+      summary: List credentials
+      responses:
+        "200":
+          description: Credentials with live state.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Credential" } }
+    post:
+      tags: [credentials]
+      operationId: createCredential
+      summary: Create credential
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CredentialInput" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Credential" }
+        "422": { $ref: "#/components/responses/Invalid" }
+  /credentials/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [credentials]
+      operationId: getCredential
+      summary: Get credential
+      responses:
+        "200":
+          description: One credential.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Credential" }
+    patch:
+      tags: [credentials]
+      operationId: updateCredential
+      summary: Update credential
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CredentialPatch" }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Credential" }
+        "422": { $ref: "#/components/responses/Invalid" }
+    delete:
+      tags: [credentials]
+      operationId: deleteCredential
+      summary: Delete credential
+      responses:
+        "204": { description: "Deleted." }
+  /credentials/{id}/reset:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    post:
+      tags: [credentials]
+      operationId: resetCredential
+      summary: Clear cooldown or quarantine and put the credential back in rotation
+      responses:
+        "200":
+          description: New live state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Credential" }
+
+  # ------------------------------------------------------------------ models & routes
+  /models:
+    get:
+      tags: [models]
+      operationId: listModels
+      summary: List models
+      responses:
+        "200":
+          description: Configured models.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Model" } }
+    post:
+      tags: [models]
+      operationId: createModel
+      summary: Create model
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ModelInput" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Model" }
+        "422": { $ref: "#/components/responses/Invalid" }
+  /models/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    patch:
+      tags: [models]
+      operationId: updateModel
+      summary: Update model
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ModelInput" }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Model" }
+        "422": { $ref: "#/components/responses/Invalid" }
+    delete:
+      tags: [models]
+      operationId: deleteModel
+      summary: Delete model
+      responses:
+        "204": { description: "Deleted." }
+  /models/sync:
+    post:
+      tags: [models]
+      operationId: syncModels
+      summary: Pull model lists from upstreams now
+      description: An empty or failed pull changes nothing. Models gone upstream are disabled, not deleted; models disabled by hand stay as they are.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                upstream_ids: { type: array, items: { type: string } }
+      responses:
+        "200":
+          description: Sync summary.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SyncResult" }
+
+  /presets:
+    get:
+      tags: [models]
+      operationId: listPresets
+      summary: List presets
+      description: Non-admins see the presets they may use, listing only their models.
+      responses:
+        "200":
+          description: Presets.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Preset" } }
+    post:
+      tags: [models]
+      operationId: createPreset
+      summary: Create preset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PresetInput" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Preset" }
+        "422": { $ref: "#/components/responses/Invalid" }
+  /presets/{name}:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [models]
+      operationId: updatePreset
+      summary: Update preset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PresetInput" }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Preset" }
+        "422": { $ref: "#/components/responses/Invalid" }
+    delete:
+      tags: [models]
+      operationId: deletePreset
+      summary: Delete preset
+      responses:
+        "204": { description: "Deleted." }
+
+  # ------------------------------------------------------------------ pricing
+  /pricing-rules:
+    get:
+      tags: [pricing]
+      operationId: listPricingRules
+      summary: List pricing rules
+      responses:
+        "200":
+          description: Rules, price sync suggestions and the last price check.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, suggestions, sync]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/PricingRule" } }
+                  suggestions:
+                    type: array
+                    description: Prices models.dev lists for existing models that differ from what they are charged now and were not rejected.
+                    items: { $ref: "#/components/schemas/PriceSuggestion" }
+                  sync: { $ref: "#/components/schemas/PriceSyncStatus" }
+    post:
+      tags: [pricing]
+      operationId: createPricingRule
+      summary: Create pricing rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PricingRuleInput" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PricingRule" }
+        "422": { $ref: "#/components/responses/Invalid" }
+  /pricing-rules/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    patch:
+      tags: [pricing]
+      operationId: updatePricingRule
+      summary: Update pricing rule
+      description: Prices sent here count as entered by hand; price sync no longer replaces them.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PricingRuleInput" }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PricingRule" }
+        "422": { $ref: "#/components/responses/Invalid" }
+    delete:
+      tags: [pricing]
+      operationId: deletePricingRule
+      summary: Delete pricing rule
+      responses:
+        "204": { description: "Deleted." }
+  /price-sync/{model}:
+    parameters: [{ $ref: "#/components/parameters/Model" }]
+    patch:
+      tags: [pricing]
+      operationId: updatePriceSync
+      summary: Follow models.dev for this model, or stop
+      description: While following, new catalog prices apply by themselves unless the model's price was entered by hand.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [follow]
+              properties:
+                follow: { type: boolean }
+      responses:
+        "204": { description: "Saved." }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/Invalid" }
+  /price-sync/{model}/accept:
+    parameters: [{ $ref: "#/components/parameters/Model" }]
+    post:
+      tags: [pricing]
+      operationId: acceptPriceSuggestion
+      summary: Make the models.dev price the model's own price
+      responses:
+        "200":
+          description: The model's rule.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PricingRule" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /price-sync/{model}/reject:
+    parameters: [{ $ref: "#/components/parameters/Model" }]
+    post:
+      tags: [pricing]
+      operationId: rejectPriceSuggestion
+      summary: Stop suggesting these prices for the model
+      description: The same prices are not suggested again; different ones are.
+      responses:
+        "204": { description: "Rejected." }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ------------------------------------------------------------------ request logs
+  /logs:
+    get:
+      tags: [logs]
+      operationId: listLogs
+      summary: Request log, newest first, by time cursor
+      description: End users only see their own requests. Every filter is a plain query parameter so a filtered view is a shareable URL.
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+        - { name: key_id, in: query, schema: { type: string } }
+        - { name: user_id, in: query, schema: { type: string } }
+        - { name: model, in: query, schema: { type: string } }
+        - { name: upstream_id, in: query, schema: { type: string } }
+        - { name: client, in: query, description: "Client id, e.g. claude-code or other.", schema: { type: string } }
+        - name: status
+          in: query
+          schema: { type: string, enum: [ok, error] }
+        - name: tier
+          in: query
+          schema: { $ref: "#/components/schemas/Tier" }
+        - name: cause
+          in: query
+          schema: { $ref: "#/components/schemas/Cause" }
+        - { name: retried, in: query, description: "Only requests the relay retried internally.", schema: { type: boolean } }
+        - { name: session_id, in: query, schema: { type: string } }
+        - { name: q, in: query, description: "Request id prefix or free text.", schema: { type: string } }
+      responses:
+        "200":
+          description: A page.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LogPage" }
+  /logs/sessions:
+    get:
+      tags: [logs]
+      operationId: listLogSessions
+      summary: The log grouped by session, newest last request first
+      description: Takes the filters of `/logs`; each session sums only the requests that matched, requests without a session id are left out. `cause` matches the final failure cause here. Without `from` and `to` it covers the last 30 days.
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+        - { name: key_id, in: query, schema: { type: string } }
+        - { name: user_id, in: query, schema: { type: string } }
+        - { name: model, in: query, schema: { type: string } }
+        - { name: upstream_id, in: query, schema: { type: string } }
+        - { name: client, in: query, schema: { type: string } }
+        - name: status
+          in: query
+          schema: { type: string, enum: [ok, error] }
+        - name: tier
+          in: query
+          schema: { $ref: "#/components/schemas/Tier" }
+        - name: cause
+          in: query
+          schema: { $ref: "#/components/schemas/Cause" }
+        - { name: retried, in: query, schema: { type: boolean } }
+        - { name: session_id, in: query, schema: { type: string } }
+        - { name: q, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: A page.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SessionPage" }
+  /logs/export:
+    get:
+      tags: [logs]
+      operationId: exportLogs
+      summary: The filtered request log as CSV
+      description: "Takes the filters of `/logs`. Streams at most 100000 rows, newest first, UTF-8 with a byte-order mark; the columns are documented in docs/api.md (Request log export). Headers are in Chinese for lang=zh-CN (or an Accept-Language starting with zh), else English. End users get their own requests and no cost column."
+      parameters:
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+        - { name: key_id, in: query, schema: { type: string } }
+        - { name: user_id, in: query, schema: { type: string } }
+        - { name: model, in: query, schema: { type: string } }
+        - { name: upstream_id, in: query, schema: { type: string } }
+        - { name: client, in: query, schema: { type: string } }
+        - name: status
+          in: query
+          schema: { type: string, enum: [ok, error] }
+        - name: tier
+          in: query
+          schema: { $ref: "#/components/schemas/Tier" }
+        - name: cause
+          in: query
+          schema: { $ref: "#/components/schemas/Cause" }
+        - { name: retried, in: query, schema: { type: boolean } }
+        - { name: session_id, in: query, schema: { type: string } }
+        - { name: q, in: query, schema: { type: string } }
+        - name: lang
+          in: query
+          schema: { type: string, enum: [zh-CN, en] }
+      responses:
+        "200":
+          description: CSV file.
+          content:
+            text/csv:
+              schema: { type: string }
+  /logs/histogram:
+    get:
+      tags: [logs]
+      operationId: getLogHistogram
+      summary: Request counts per time bucket for the log's filters
+      description: Takes the same filters as `/logs` (except `cause` and the cursor). Every bucket from `from` (default 24 hours before `to`) to `to` (default now) is listed, empty ones with zero; the bucket size gives 30–60 bars.
+      parameters:
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+        - { name: key_id, in: query, schema: { type: string } }
+        - { name: user_id, in: query, schema: { type: string } }
+        - { name: model, in: query, schema: { type: string } }
+        - { name: upstream_id, in: query, schema: { type: string } }
+        - { name: client, in: query, schema: { type: string } }
+        - name: status
+          in: query
+          schema: { type: string, enum: [ok, error] }
+        - name: tier
+          in: query
+          schema: { $ref: "#/components/schemas/Tier" }
+        - { name: retried, in: query, schema: { type: boolean } }
+        - { name: session_id, in: query, schema: { type: string } }
+        - { name: q, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Buckets, oldest first.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LogHistogram" }
+  /logs/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [logs]
+      operationId: getLog
+      summary: Get log
+      responses:
+        "200":
+          description: Everything known about one request.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LogDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ------------------------------------------------------------------ features
+  /features:
+    get:
+      tags: [features]
+      operationId: listFeatures
+      summary: List features
+      responses:
+        "200":
+          description: Every feature with its state, its modules, its settings (global layer) and its console pages.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Feature" } }
+                  reload_error: { $ref: "#/components/schemas/ReloadError" }
+  /features/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    patch:
+      tags: [features]
+      operationId: updateFeature
+      summary: Switch a feature or change its settings
+      description: |
+        Turning a feature on turns on its modules (and what they require).
+        409 when the change would leave a configuration the relay cannot run
+        (a fail-closed module losing a plugin it requires, a module refusing
+        stored settings) or when turning off a feature that always runs;
+        nothing is stored then. Settings change on the global layer; only the
+        ones named change and `null` removes one.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled: { type: boolean }
+                settings: { $ref: "#/components/schemas/SettingValues" }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Feature" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/Invalid" }
+  /extensions:
+    get:
+      tags: [features]
+      operationId: listExtensions
+      summary: List extensions
+      responses:
+        "200":
+          description: Plugins outside the built-in features, in run order.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Extension" } }
+                  reload_error: { $ref: "#/components/schemas/ReloadError" }
+  /extensions/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    patch:
+      tags: [features]
+      operationId: updateExtension
+      summary: Switch an extension, approve its host permissions, set its order or settings
+      description: |
+        Enabling needs `approved_permissions` to list every host permission
+        the extension declares. 409 for an unapproved permission or a change
+        the relay cannot run; nothing is stored then. Settings are its
+        global layer, by key.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled: { type: boolean }
+                order: { type: integer, description: "Run order among plugins; lower runs first." }
+                approved_permissions: { type: array, items: { type: string } }
+                settings: { type: object, additionalProperties: true }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Extension" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/Invalid" }
+
+  # ------------------------------------------------------------------ settings
+  /settings:
+    get:
+      tags: [settings]
+      operationId: getSettings
+      summary: Get settings
+      responses:
+        "200":
+          description: Every site setting with how a change takes effect.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/SettingItem" } }
+    patch:
+      tags: [settings]
+      operationId: updateSettings
+      summary: Update settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [values]
+              properties:
+                values: { type: object, additionalProperties: true }
+                confirm_currency_change: { type: boolean, description: "Change site.currency although prepaid balances exist (they are not converted)." }
+      responses:
+        "200":
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, restart_required]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/SettingItem" } }
+                  restart_required: { type: boolean }
+        "409":
+          description: A setting comes from relay.yaml and cannot be changed here, site.currency would change while balances exist (balances_exist), or `security.password_login` would turn off without a single sign-on provider the caller has signed in with (an operator token may).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422": { $ref: "#/components/responses/Invalid" }
+
+  # ------------------------------------------------------------------ single sign-on
+  /sso/providers:
+    get:
+      tags: [settings]
+      operationId: listSsoProviders
+      summary: Single sign-on providers
+      description: |
+        Providers are offered on the login page only while the `sso` feature
+        is on. Whether password sign-in stays available is the site setting
+        `security.password_login`.
+      responses:
+        "200":
+          description: Providers (secrets omitted), the presets to create from and the redirect base.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SsoProviders" }
+    post:
+      tags: [settings]
+      operationId: createSsoProvider
+      summary: Add a single sign-on provider
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SsoProviderInput" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SsoProvider" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/Invalid" }
+  /sso/providers/{id}:
+    patch:
+      tags: [settings]
+      operationId: updateSsoProvider
+      summary: Change a provider; omitted fields and an empty client_secret keep their values
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SsoProviderInput" }
+      responses:
+        "200":
+          description: Saved.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SsoProvider" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/Invalid" }
+    delete:
+      tags: [settings]
+      operationId: deleteSsoProvider
+      summary: Remove a provider and unlink its identities
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "204": { description: "Removed." }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  # ------------------------------------------------------------------ mcp
+  /mcp/servers:
+    get:
+      tags: [mcp]
+      operationId: listMcpServers
+      summary: List MCP servers
+      responses:
+        "200":
+          description: Every configured server; secret header values omitted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/McpServer" } }
+    post:
+      tags: [mcp]
+      operationId: createMcpServer
+      summary: Add an MCP server
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/McpServerInput" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McpServer" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/Invalid" }
+  /mcp/servers/{id}:
+    get:
+      tags: [mcp]
+      operationId: getMcpServer
+      summary: One MCP server
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "200":
+          description: The server.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McpServer" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [mcp]
+      operationId: updateMcpServer
+      summary: Change an MCP server; omitted fields keep their values, an empty secret header value removes it
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/McpServerInput" }
+      responses:
+        "200":
+          description: Saved.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McpServer" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/Invalid" }
+    delete:
+      tags: [mcp]
+      operationId: deleteMcpServer
+      summary: Remove an MCP server
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "204": { description: "Removed." }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /mcp/servers/{id}/test:
+    post:
+      tags: [mcp]
+      operationId: testMcpServer
+      summary: Connect to an MCP server and list its tools
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "200":
+          description: One result, what the test found; ok=false carries the error.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/TestOutcome"
+                  - type: object
+                    properties:
+                      results: { type: array, items: { $ref: "#/components/schemas/McpTestResult" } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ------------------------------------------------------------------ notifications
+  /notifications:
+    get:
+      tags: [notifications]
+      operationId: listNotifications
+      summary: Recent notifications, newest first, with their delivery per channel
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+      responses:
+        "200":
+          description: The log (the last 500 are kept).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Notification" } }
+        "422": { $ref: "#/components/responses/Invalid" }
+  /notifications/channels:
+    get:
+      tags: [notifications]
+      operationId: listNotifyChannels
+      summary: List notification channels
+      responses:
+        "200":
+          description: Every channel (secrets omitted), the events a channel can take and the record fields a webhook can receive.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, events, record_fields, public_url_set]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/NotifyChannel" } }
+                  events: { type: array, items: { $ref: "#/components/schemas/NotifyEvent" } }
+                  record_fields: { type: array, items: { type: string }, description: "Posted when a webhook selects none; `body` can be added." }
+                  public_url_set: { type: boolean, description: "Messages link to the console only when the site's public URL is set." }
+    post:
+      tags: [notifications]
+      operationId: createNotifyChannel
+      summary: Add a notification channel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NotifyChannelInput" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NotifyChannel" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/Invalid" }
+  /notifications/channels/{id}:
+    patch:
+      tags: [notifications]
+      operationId: updateNotifyChannel
+      summary: Change a channel; omitted fields keep their values, an omitted or empty url or password keeps the stored one
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NotifyChannelInput" }
+      responses:
+        "200":
+          description: Saved.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NotifyChannel" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/Invalid" }
+    delete:
+      tags: [notifications]
+      operationId: deleteNotifyChannel
+      summary: Remove a channel
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "204": { description: "Removed." }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /notifications/channels/{id}/test:
+    post:
+      tags: [notifications]
+      operationId: testNotifyChannel
+      summary: Send a test message to a channel (it is logged like any notification)
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "200":
+          description: One result; ok=false carries the error.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/TestOutcome"
+                  - type: object
+                    properties:
+                      results: { type: array, items: { $ref: "#/components/schemas/NotifyTestResult" } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  # ------------------------------------------------------------------ audit
+  /audit:
+    get:
+      tags: [audit]
+      operationId: listAudit
+      summary: List audit log
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - { name: actor_id, in: query, schema: { type: string } }
+        - { name: action, in: query, description: "Comma-separated actions; `key.*` matches every action starting with `key.`.", schema: { type: string, examples: ["key.*,credential.reset"] } }
+        - { name: target_type, in: query, schema: { type: string } }
+        - { name: target_id, in: query, description: "One object's history; needs `target_type`.", schema: { type: string } }
+      responses:
+        "200":
+          description: A page.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuditPage" }
+
+  # ------------------------------------------------------------------ search
+  /search:
+    get:
+      tags: [search]
+      operationId: search
+      summary: One box for keys, upstreams, request ids, users, models, features and extensions
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        "200":
+          description: Hits, best first, only of things the caller may see.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/SearchHit" } }
+
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: pr_session
+      description: HttpOnly, SameSite=Lax, Secure when served over HTTPS. Unsafe methods also need `X-CSRF-Token`.
+    bearer:
+      type: http
+      scheme: bearer
+      description: Admin token from the PLUGRELAY_ADMIN_TOKEN environment variable or created in settings. Platform keys (`pr_…`) are not accepted here.
+
+  headers:
+    SessionCookie:
+      description: "`pr_session` (HttpOnly) and `pr_csrf` (readable by script, echoed in `X-CSRF-Token`)."
+      schema: { type: string }
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+    Model:
+      name: model
+      in: path
+      required: true
+      description: Model name, path-escaped (a "/" in the name as %2F).
+      schema: { type: string }
+    Cursor:
+      name: cursor
+      in: query
+      description: "`next_cursor` from the previous page."
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+    Range:
+      name: range
+      in: query
+      description: Preset window ending now; ignored when `from` is set.
+      schema: { $ref: "#/components/schemas/TimeRange" }
+    From:
+      name: from
+      in: query
+      schema: { type: string, format: date-time }
+    To:
+      name: to
+      in: query
+      schema: { type: string, format: date-time }
+
+  responses:
+    Invalid:
+      description: Validation failed; `fields` points at each bad field.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example:
+            error:
+              code: invalid
+              message: 2 fields are invalid
+              fields:
+                - { path: name, message: must not be empty }
+                - { path: settings.ip_allowlist.0, message: not a valid CIDR }
+    NotFound:
+      description: Not found or not visible to the caller.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: The request conflicts with current state.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: "Refused: e.g. `reauth_required` (confirm it is you with POST /me/reauth first) or `mfa_enrollment_required`."
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Not logged in or wrong credentials.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    TooMany:
+      description: Too many attempts; see Retry-After.
+      headers:
+        Retry-After: { schema: { type: integer } }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    UpstreamFailed:
+      description: The upstream call failed; message is the upstream's text.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    # ---------------------------------------------------------------- common
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: >-
+                Stable machine id of what went wrong; clients branch on it and word it in their own
+                language, filling `params`. `invalid` means the request body failed validation and
+                `fields` says where.
+              examples: [admin_required, not_found, conflict, invalid, csrf, reauth_required]
+            params:
+              $ref: "#/components/schemas/ErrorParams"
+            message: { type: string, description: "The same in English, params filled in; for logs and clients that do not know the code." }
+            fields:
+              type: array
+              items:
+                type: object
+                required: [path, code, message]
+                properties:
+                  path: { type: string, description: "Dot path into the request body." }
+                  code: { type: string, description: "Stable machine id, as `error.code`.", examples: [required, length_range] }
+                  params:
+                    $ref: "#/components/schemas/ErrorParams"
+                  message: { type: string, description: "English, params filled in." }
+            request_id: { type: string }
+    ErrorParams:
+      type: object
+      description: Values the error's wording refers to by name, such as `{min}` and `{max}`.
+      additionalProperties:
+        oneOf: [{ type: string }, { type: number }]
+    Money:
+      type: object
+      description: Integer micro-units of `currency`.
+      required: [micro, currency]
+      properties:
+        micro: { type: integer, format: int64 }
+        currency: { type: string, minLength: 3, maxLength: 3, examples: [CNY, USD] }
+      example: { micro: 197000, currency: CNY }
+    TimeRange:
+      type: string
+      enum: [1h, 24h, 7d, 30d, 90d]
+      default: 7d
+    Role:
+      type: string
+      enum: [admin, member, user]
+      description: admin manages the relay; member is a team member with own keys; user is an end user of a selling site.
+    Tier:
+      type: string
+      enum: [passthrough, patch, convert]
+      description: passthrough = body forwarded byte for byte; patch = named fields edited in place; convert = decoded and re-encoded.
+    Cause:
+      type: string
+      enum: [request, transient, rate_limit, quota, auth_expired, banned, content, unknown]
+    ErrorKind:
+      type: string
+      enum: [invalid_request, context_too_long, authentication, permission, not_found, rate_limited, quota_exhausted, overloaded, content_filtered, capability_missing, timeout, internal, upstream]
+    Fidelity:
+      type: string
+      enum: [lossless, lossy, discouraged, impossible]
+    Usage:
+      type: object
+      description: Token counts unified into five buckets; `raw` is the upstream's usage object verbatim.
+      required: [input, cache_read, cache_write_5m, cache_write_1h, output, reasoning]
+      properties:
+        input: { type: integer, format: int64, description: "Uncached input." }
+        cache_read: { type: integer, format: int64 }
+        cache_write_5m: { type: integer, format: int64 }
+        cache_write_1h: { type: integer, format: int64 }
+        output: { type: integer, format: int64, description: "All output, reasoning included." }
+        reasoning: { type: integer, format: int64 }
+        estimated: { type: boolean, description: "The upstream never reported usage; counts are estimates." }
+        raw: { description: "Upstream usage object, verbatim." }
+    ModelInfo:
+      type: object
+      required: [id, tools, vision, reasoning]
+      properties:
+        id: { type: string }
+        display_name: { type: string }
+        owned_by: { type: string }
+        context_window: { type: integer }
+        max_output: { type: integer }
+        tools: { type: boolean }
+        vision: { type: boolean }
+        reasoning: { type: boolean }
+        efforts: { type: array, items: { type: string } }
+        created: { type: integer, format: int64 }
+    Ref:
+      type: object
+      description: A pointer to another object, with a display name.
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+
+    # ---------------------------------------------------------------- setup & auth
+    SetupStatus:
+      type: object
+      required: [needs_setup, version]
+      properties:
+        needs_setup: { type: boolean }
+        version: { type: string }
+        listen: { type: string, description: "Current listen address.", examples: ["127.0.0.1:8080"] }
+    SetupRequest:
+      type: object
+      required: [admin_username, admin_password, usage, listen_public]
+      properties:
+        admin_username: { type: string, minLength: 1 }
+        admin_password: { type: string, minLength: 10, writeOnly: true }
+        usage:
+          type: string
+          enum: [myself, team, sell]
+          description: How the relay will be used; see POST /setup for what each answer turns on.
+        listen_public:
+          type: boolean
+          description: Listen on all interfaces instead of loopback. Takes effect after a restart.
+        site_name: { type: string }
+        currency: { type: string, minLength: 3, maxLength: 3, default: USD }
+        public_url:
+          type: string
+          description: Address clients use to reach the relay (stored as the site's public URL); empty leaves it unset.
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string }
+        password: { type: string, writeOnly: true }
+        captcha_token: { type: string, description: "Turnstile or hCaptcha response, once the address has failed `captcha.after_failures` times (see /auth/providers)." }
+    MfaMethod: { type: string, enum: [totp, passkey, recovery] }
+    MfaChallenge:
+      type: object
+      required: [mfa_required, methods, expires_at]
+      properties:
+        mfa_required: { type: boolean, enum: [true] }
+        methods: { type: array, items: { $ref: "#/components/schemas/MfaMethod" } }
+        expires_at: { type: string, format: date-time }
+    FactorInput:
+      type: object
+      required: [method]
+      properties:
+        method: { type: string, enum: [totp, recovery, passkey, password], description: "`password` only for /me/reauth." }
+        code: { type: string, description: "TOTP or recovery code." }
+        password: { type: string, writeOnly: true }
+        credential: { $ref: "#/components/schemas/PasskeyCredential" }
+    PasskeyCredential:
+      type: object
+      description: "PublicKeyCredential.toJSON(): binary fields base64url."
+      required: [id, rawId, type, response]
+      properties:
+        id: { type: string }
+        rawId: { type: string }
+        type: { type: string, enum: [public-key] }
+        response:
+          type: object
+          required: [clientDataJSON]
+          properties:
+            clientDataJSON: { type: string }
+            attestationObject: { type: string }
+            authenticatorData: { type: string }
+            signature: { type: string }
+            userHandle: { type: string }
+            transports: { type: array, items: { type: string } }
+    PasskeyDescriptor:
+      type: object
+      required: [type, id]
+      properties:
+        type: { type: string, enum: [public-key] }
+        id: { type: string }
+        transports: { type: array, items: { type: string } }
+    PasskeyRequestOptions:
+      type: object
+      required: [challenge, rpId, timeout, userVerification, allowCredentials]
+      properties:
+        challenge: { type: string }
+        rpId: { type: string }
+        timeout: { type: integer }
+        userVerification: { type: string, enum: [required, preferred, discouraged] }
+        allowCredentials: { type: array, items: { $ref: "#/components/schemas/PasskeyDescriptor" } }
+    PasskeyCreationOptions:
+      type: object
+      required: [challenge, rp, user, pubKeyCredParams, timeout, attestation, excludeCredentials, authenticatorSelection]
+      properties:
+        challenge: { type: string }
+        rp:
+          type: object
+          required: [id, name]
+          properties:
+            id: { type: string }
+            name: { type: string }
+        user:
+          type: object
+          required: [id, name, displayName]
+          properties:
+            id: { type: string }
+            name: { type: string }
+            displayName: { type: string }
+        pubKeyCredParams:
+          type: array
+          items:
+            type: object
+            required: [type, alg]
+            properties:
+              type: { type: string, enum: [public-key] }
+              alg: { type: integer }
+        timeout: { type: integer }
+        attestation: { type: string, enum: [none] }
+        excludeCredentials: { type: array, items: { $ref: "#/components/schemas/PasskeyDescriptor" } }
+        authenticatorSelection:
+          type: object
+          properties:
+            residentKey: { type: string }
+            userVerification: { type: string }
+    Passkey:
+      type: object
+      required: [id, name, created_at, last_used_at]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        created_at: { type: string, format: date-time }
+        last_used_at: { type: ["string", "null"], format: date-time }
+        transports: { type: array, items: { type: string } }
+    RecoveryCodes:
+      type: object
+      required: [recovery_codes]
+      properties:
+        recovery_codes: { type: array, items: { type: string }, description: "Shown once; each works one time." }
+    SecurityStatus:
+      type: object
+      required: [totp_enabled, recovery_codes_left, passkeys, has_password, required]
+      properties:
+        totp_enabled: { type: boolean }
+        recovery_codes_left: { type: integer }
+        passkeys: { type: array, items: { $ref: "#/components/schemas/Passkey" } }
+        has_password: { type: boolean }
+        required: { type: boolean, description: "security.require_2fa_admins applies to the caller." }
+        enroll_by: { type: string, format: date-time, description: "End of the grace period, when required." }
+        passkeys_unavailable: { type: string, enum: [public_url_missing], description: "Why passkeys cannot be used on this relay." }
+    Me:
+      type: object
+      required: [user, auth, permissions, site, features, pages]
+      properties:
+        user:
+          type: object
+          required: [id, username, role]
+          properties:
+            id: { type: string }
+            username: { type: string }
+            display_name: { type: string }
+            role: { $ref: "#/components/schemas/Role" }
+            group_id: { type: string }
+        auth:
+          type: string
+          enum: [session, bearer, none]
+          description: "`none` = the local owner on loopback, no login (`security.local_owner_login`)."
+        permissions:
+          type: array
+          description: Coarse capabilities the console uses to build menus. The server enforces them on every call regardless.
+          items:
+            type: string
+            enum: [upstreams.manage, models.manage, users.manage, features.manage, settings.manage, audit.read, keys.manage_all, logs.read_all]
+        features:
+          type: array
+          items: { type: string }
+          description: Ids of the features that are on.
+        pages:
+          type: array
+          items: { type: string, examples: [billing.orders, sso.providers] }
+          description: Console pages of features that are on that the caller sees (operator pages for admins, the others for everyone else), by stable page id.
+        site:
+          type: object
+          required: [name, currency, show_upstream_names]
+          properties:
+            name: { type: string }
+            currency: { type: string }
+            logo_url: { type: string }
+            accent: { type: string, description: "CSS color for the console accent." }
+            show_upstream_names: { type: boolean, description: "When false, end users only see the upstream type." }
+            public_base_url: { type: string, description: "Base URL clients should use." }
+        mfa:
+          type: object
+          description: Two-step sign-in of a session user.
+          required: [enabled, required]
+          properties:
+            enabled: { type: boolean }
+            required: { type: boolean }
+            enroll_by: { type: string, format: date-time, description: "Set while required and not yet enabled; after it, admin operations answer 403 `mfa_enrollment_required`." }
+      example:
+        user: { id: u_1, username: admin, role: admin }
+        auth: session
+        features: [limits, routing, request_log, billing, metrics]
+        pages: [billing.balances, billing.codes, billing.plans, billing.import]
+        permissions: [upstreams.manage, models.manage, users.manage, features.manage, settings.manage, audit.read, keys.manage_all, logs.read_all]
+        site: { name: plugrelay, currency: CNY, show_upstream_names: true, public_base_url: "https://relay.example.com" }
+
+    # ---------------------------------------------------------------- overview
+    Overview:
+      type: object
+      required: [range, from, to, spend, spend_prev, requests, requests_prev, success_rate, cache_hit_rate, cache_saved, avg_price_per_mtok]
+      properties:
+        range: { $ref: "#/components/schemas/TimeRange" }
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        balance:
+          description: Present only when a balance meter is enabled.
+          type: object
+          required: [amount]
+          properties:
+            amount: { $ref: "#/components/schemas/Money" }
+            days_left: { type: number, description: "At the recent spend rate." }
+        spend: { $ref: "#/components/schemas/Money" }
+        spend_prev: { $ref: "#/components/schemas/Money", description: "Same-length window before `from`." }
+        requests: { type: integer, format: int64 }
+        requests_prev: { type: integer, format: int64, description: "Same-length window before `from`." }
+        success_rate: { type: number, minimum: 0, maximum: 1 }
+        success_rate_prev: { type: number, minimum: 0, maximum: 1, description: "Absent when the previous window had no requests." }
+        cache_hit_rate: { type: number, minimum: 0, maximum: 1, description: "cache_read / total input tokens." }
+        cache_hit_rate_prev: { type: number, minimum: 0, maximum: 1, description: "Absent when the previous window had no input." }
+        ttfb_p95_ms: { type: integer, description: "95th percentile time to first token of successful requests; absent when none got one." }
+        ttfb_p95_prev_ms: { type: integer, description: "The same for the previous window." }
+        cache_saved: { $ref: "#/components/schemas/Money", description: "What cached tokens would have cost at the uncached input price, minus what they cost." }
+        avg_price_per_mtok: { $ref: "#/components/schemas/Money", description: "Spend per million tokens (input + output)." }
+      example:
+        range: 7d
+        from: "2026-10-29T00:00:00Z"
+        to: "2026-11-05T00:00:00Z"
+        balance: { amount: { micro: 128400000, currency: CNY }, days_left: 9 }
+        spend: { micro: 36200000, currency: CNY }
+        spend_prev: { micro: 32300000, currency: CNY }
+        requests: 4812
+        success_rate: 0.992
+        cache_hit_rate: 0.71
+        cache_saved: { micro: 58100000, currency: CNY }
+        avg_price_per_mtok: { micro: 1900000, currency: CNY }
+    UsageTop:
+      type: object
+      required: [range, from, to, by, items]
+      properties:
+        range: { type: string }
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        by: { type: string, enum: [model, key, user, client] }
+        items:
+          type: array
+          items:
+            type: object
+            required: [key, label, requests, errors, spend, tokens, cache_hit_rate, ttfb_p95_ms]
+            properties:
+              key: { type: string }
+              label: { type: string, description: "Name; empty for client other." }
+              requests: { type: integer, format: int64 }
+              errors: { type: integer, format: int64 }
+              spend: { $ref: "#/components/schemas/Money" }
+              tokens: { type: integer, format: int64 }
+              cache_hit_rate: { type: ["number", "null"] }
+              ttfb_p95_ms: { type: ["integer", "null"] }
+    UsageFailures:
+      type: object
+      required: [range, bucket_seconds, series]
+      properties:
+        range: { type: string }
+        bucket_seconds: { type: integer }
+        series:
+          type: array
+          items:
+            type: object
+            required: [cause, total, points]
+            properties:
+              cause: { type: string, enum: [request, transient, rate_limit, quota, auth_expired, banned, content, unknown, not_sent] }
+              total: { type: integer, format: int64 }
+              points:
+                type: array
+                items:
+                  type: object
+                  required: [t, v]
+                  properties:
+                    t: { type: string, format: date-time }
+                    v: { type: number }
+    Timeseries:
+      type: object
+      required: [metric, bucket_seconds, series]
+      properties:
+        metric: { type: string }
+        bucket_seconds: { type: integer }
+        currency: { type: string, description: "Set when metric is spend; values are micro-units." }
+        series:
+          type: array
+          items:
+            type: object
+            required: [key, label, points]
+            properties:
+              key: { type: string }
+              label: { type: string }
+              points:
+                type: array
+                items:
+                  type: object
+                  required: [t, v]
+                  properties:
+                    t: { type: string, format: date-time }
+                    v: { type: number }
+    QuotaWindow:
+      type: object
+      required: [id, kind, used, limit, resets_at]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [5h, daily, weekly, monthly, total] }
+        label: { type: string, description: "Set by plugins for custom windows." }
+        scope: { type: string, enum: [key, user, group], description: "Which layer imposes it." }
+        used: { $ref: "#/components/schemas/Money" }
+        limit: { $ref: "#/components/schemas/Money" }
+        resets_at: { type: ["string", "null"], format: date-time, description: "Null for windows that never reset." }
+      example: { id: w5h, kind: 5h, scope: user, used: { micro: 6200000, currency: CNY }, limit: { micro: 10000000, currency: CNY }, resets_at: "2026-11-05T18:40:00+08:00" }
+    StatusPage:
+      type: object
+      required: [items, updated_at]
+      properties:
+        updated_at: { type: string, format: date-time }
+        items:
+          type: array
+          items:
+            type: object
+            required: [model, state, success_rate_24h, hourly]
+            properties:
+              model: { type: string }
+              state: { type: string, enum: [ok, degraded, down] }
+              success_rate_24h: { type: number }
+              ttfb_p50_ms: { type: integer }
+              hourly:
+                type: array
+                description: 24 hourly success ratios, oldest first; null = no traffic.
+                items: { type: ["number", "null"] }
+    PublicSite:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        logo_url: { type: string }
+        accent: { type: string }
+    PublicCatalog:
+      type: object
+      required: [site, currency, items, updated_at]
+      properties:
+        site: { $ref: "#/components/schemas/PublicSite" }
+        currency: { type: string }
+        updated_at: { type: string, format: date-time }
+        items: { type: array, items: { $ref: "#/components/schemas/CatalogEntry" } }
+    PublicStatus:
+      allOf:
+        - { $ref: "#/components/schemas/StatusPage" }
+        - type: object
+          required: [site, overall]
+          properties:
+            site: { $ref: "#/components/schemas/PublicSite" }
+            overall: { type: string, enum: [ok, degraded, down] }
+    PlaygroundRequest:
+      type: object
+      required: [protocol, model, messages]
+      properties:
+        key_id: { type: string, description: "One of the caller's keys; admins may leave it out." }
+        protocol: { type: string, enum: [anthropic, openai-chat, openai-responses, gemini] }
+        model: { type: string, description: "A model or preset." }
+        system: { type: string }
+        messages:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [role, content]
+            properties:
+              role: { type: string, enum: [user, assistant] }
+              content: { type: string }
+        temperature: { type: number, minimum: 0, maximum: 2 }
+        max_tokens: { type: integer, minimum: 1, maximum: 128000, description: "Default 1024." }
+        reasoning_effort: { type: string, enum: [low, medium, high] }
+    CatalogEntry:
+      type: object
+      required: [model, kind, price]
+      properties:
+        model: { type: string }
+        kind: { type: string, enum: [model, preset] }
+        info: { $ref: "#/components/schemas/ModelInfo" }
+        price: { $ref: "#/components/schemas/TokenPrices" }
+        preset_models: { type: array, items: { type: string }, description: "For a preset, the models the caller may use through it, in order." }
+
+    # ---------------------------------------------------------------- keys
+    KeyStatus:
+      type: string
+      enum: [active, disabled, expired, over_budget]
+    ClientId:
+      type: string
+      enum: [claude-code, codex, gemini-cli, cursor, cline, opencode, curl]
+    ClientOS:
+      type: string
+      enum: [macos, linux, windows]
+    KeySettings:
+      type: object
+      description: Per-key overrides. Budget, concurrency and lists can only tighten the group's values unless an admin marks `exception`.
+      properties:
+        budget_monthly: { $ref: "#/components/schemas/Money" }
+        budget_total: { $ref: "#/components/schemas/Money" }
+        models: { type: array, items: { type: string }, description: "Allowed model names or globs; empty = inherit." }
+        clients: { type: array, items: { type: string }, description: "Allowed clients: ids from /clients (not other), matched the way the request log names the client; empty = any." }
+        ip_allowlist: { type: array, items: { type: string }, description: "CIDRs or addresses." }
+        expires_at: { type: ["string", "null"], format: date-time }
+        max_concurrency: { type: integer, minimum: 0, description: "0 = inherit." }
+        rpm: { type: integer, minimum: 0 }
+        exception: { type: boolean, description: "Admin-only; lets this key loosen group limits." }
+    Key:
+      type: object
+      required: [id, name, last4, status, created_at, month_spend, settings]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        prefix: { type: string, examples: [pr_] }
+        last4: { type: string, examples: ["3f9a"] }
+        owner: { $ref: "#/components/schemas/Ref" }
+        group: { $ref: "#/components/schemas/Ref" }
+        status: { $ref: "#/components/schemas/KeyStatus" }
+        created_at: { type: string, format: date-time }
+        last_used_at: { type: ["string", "null"], format: date-time }
+        month_spend: { $ref: "#/components/schemas/Money" }
+        settings: { $ref: "#/components/schemas/KeySettings" }
+      example:
+        id: k_01
+        name: laptop-claude
+        prefix: pr_
+        last4: "3f9a"
+        owner: { id: u_1, name: admin }
+        status: active
+        created_at: "2026-10-01T08:00:00Z"
+        last_used_at: "2026-11-05T06:32:08Z"
+        month_spend: { micro: 36200000, currency: CNY }
+        settings: { models: ["claude-*", "gpt-5.5"], max_concurrency: 4 }
+    KeyInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 64 }
+        user_id: { type: string, description: "Admins may create keys for others." }
+        group_id: { type: string }
+        settings: { $ref: "#/components/schemas/KeySettings" }
+    KeyPatch:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 64 }
+        enabled: { type: boolean }
+        group_id: { type: string }
+        settings: { $ref: "#/components/schemas/KeySettings" }
+    KeyCreated:
+      type: object
+      required: [key, secret]
+      properties:
+        key: { $ref: "#/components/schemas/Key" }
+        secret: { type: string, description: "The full key. Returned only here.", examples: ["pr_7Yc2kQx0b1Lm9tR4vN8sW3pZ5dF6hJ3f9a"] }
+    ConnectInfo:
+      type: object
+      required: [base_url, placeholder, clients, common_errors]
+      properties:
+        base_url: { type: string }
+        placeholder: { type: string, const: "{{api_key}}" }
+        clients:
+          type: array
+          items: { $ref: "#/components/schemas/ConnectClient" }
+        common_errors:
+          type: array
+          items:
+            type: object
+            required: [symptom, fix]
+            properties:
+              symptom: { type: string, description: "The error text as the client shows it, verbatim.", examples: ["401 invalid x-api-key"] }
+              fix: { $ref: "#/components/schemas/LocalizedText" }
+    ConnectClient:
+      type: object
+      required: [client, name, os, snippets]
+      properties:
+        client: { $ref: "#/components/schemas/ClientId" }
+        name: { type: string, examples: [Claude Code] }
+        os: { $ref: "#/components/schemas/ClientOS" }
+        snippets:
+          type: array
+          items:
+            type: object
+            required: [title, language, content]
+            properties:
+              title: { $ref: "#/components/schemas/LocalizedText" }
+              path: { type: string, description: "File to write it to, if any." }
+              language: { type: string, enum: [bash, powershell, toml, json, yaml, text] }
+              content: { type: string }
+        ccswitch_url: { type: string, description: "`ccswitch://` import link; contains the placeholder." }
+        notes: { type: array, items: { $ref: "#/components/schemas/LocalizedText" } }
+    TestResult:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+        upstream_id: { type: string }
+        credential_id: { type: string }
+        endpoint_id: { type: string }
+        model: { type: string }
+        status: { type: integer }
+        ttfb_ms: { type: integer }
+        latency_ms: { type: integer }
+        error: { type: string, description: "Error text verbatim." }
+        request_id: { type: string, description: "Log entry for this test, when one was written." }
+    TestOutcome:
+      type: object
+      description: What every test action (upstream, key, MCP server) answers.
+      required: [ok, results]
+      properties:
+        ok: { type: boolean, description: "Something was tested and every result passed." }
+        results: { type: array, items: { $ref: "#/components/schemas/TestResult" } }
+    TestRequest:
+      type: object
+      properties:
+        model: { type: string }
+        credential_id: { type: string }
+        endpoint_id: { type: string }
+
+    # ---------------------------------------------------------------- users & groups
+    User:
+      type: object
+      required: [id, username, role, status, created_at, month_spend]
+      properties:
+        id: { type: string }
+        username: { type: string }
+        display_name: { type: string }
+        email: { type: string }
+        role: { $ref: "#/components/schemas/Role" }
+        group: { $ref: "#/components/schemas/Ref" }
+        status: { type: string, enum: [active, disabled] }
+        created_at: { type: string, format: date-time }
+        last_seen_at: { type: ["string", "null"], format: date-time }
+        key_count: { type: integer }
+        month_spend: { $ref: "#/components/schemas/Money" }
+        balance: { $ref: "#/components/schemas/Money", description: "Available balance of the account the user pays from (theirs, or their group's when meter.balance pays per group; absent when each key pays); only while meter.balance runs." }
+        mfa_enabled: { type: boolean, description: "The user has an authenticator app or a passkey." }
+    UserInput:
+      type: object
+      required: [username, role]
+      properties:
+        username: { type: string, minLength: 1, description: "Login name; usually the email address. It cannot be changed later." }
+        display_name: { type: string }
+        password: { type: string, minLength: 10, writeOnly: true }
+        role: { $ref: "#/components/schemas/Role" }
+        group_id: { type: string }
+    UserPatch:
+      type: object
+      properties:
+        display_name: { type: string }
+        password: { type: string, minLength: 10, writeOnly: true }
+        role: { $ref: "#/components/schemas/Role" }
+        group_id: { type: string }
+        status: { type: string, enum: [active, disabled] }
+    Group:
+      type: object
+      required: [id, name, member_count, models]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        member_count: { type: integer }
+        models: { type: array, items: { type: string }, description: "Allowed model names or globs." }
+        show_upstream_names: { type: boolean }
+        log_bodies: { type: boolean, description: "Store request and response text of members' requests; the only per-group switch for it." }
+        price_multiplier: { type: number, description: "Applied to list prices when charging members; 1 = list price. Callers only ever see the resulting prices." }
+    GroupInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+        models: { type: array, items: { type: string } }
+        show_upstream_names: { type: boolean }
+        log_bodies: { type: boolean }
+        price_multiplier: { type: number, exclusiveMinimum: 0, maximum: 1000 }
+
+    # ---------------------------------------------------------------- upstreams
+    Endpoint:
+      type: object
+      description: One protocol entry of an upstream.
+      required: [id, protocol, base_url]
+      properties:
+        id: { type: string }
+        protocol: { type: string, examples: [anthropic, openai-chat, openai-responses, gemini] }
+        base_url: { type: string }
+        issuer: { type: string }
+        path: { type: string }
+        query: { type: object, additionalProperties: { type: string } }
+        drop_betas: { type: array, items: { type: string } }
+    ManifestSource:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [official, file, site], description: "official = shipped YAML manifest; file = local YAML; site = created in the console." }
+        name: { type: string, examples: [deepseek] }
+        version: { type: string }
+        overridden: { type: array, items: { type: string }, description: "Field paths this site overrides." }
+    CircuitState:
+      type: object
+      required: [state]
+      properties:
+        state: { type: string, enum: [closed, open, half_open] }
+        until: { type: ["string", "null"], format: date-time, description: "When the next probe request is let through." }
+        reason: { type: string, enum: [failures, probing], description: "failures = opened after repeated upstream failures; probing = half open, one probe request decides. Absent while closed." }
+    UpstreamStats:
+      type: object
+      required: [success_rate_24h, requests_24h, hourly]
+      properties:
+        success_rate_24h: { type: ["number", "null"] }
+        requests_24h: { type: integer }
+        ttfb_p50_ms: { type: integer }
+        hourly:
+          type: array
+          description: 24 hourly success ratios, oldest first; null = no traffic.
+          items: { type: ["number", "null"] }
+    CredentialStatus:
+      type: string
+      enum: [ok, cooldown, circuit_open, quarantined, manual, refreshing, disabled]
+      description: |
+        ok = in rotation; cooldown = out until `until`; circuit_open = the
+        upstream breaker is open; quarantined = suspected ban, waits for a
+        human; manual = needs a human for another reason; disabled = by hand.
+    CredentialState:
+      type: object
+      description: Live state read from the router.
+      required: [status]
+      properties:
+        status: { $ref: "#/components/schemas/CredentialStatus" }
+        reason: { type: string, description: "Why the credential is in this state: the verdict's cause (a Cause value) when a failed attempt set it, else a short note such as \"quota used up (quota probe)\"." }
+        until: { type: ["string", "null"], format: date-time }
+        model_scope: { type: string, description: "Set when only one model is cooling down." }
+        in_flight: { type: integer }
+        success_rate_24h: { type: ["number", "null"] }
+        quota:
+          type: object
+          description: "Last upstream quota probe (job.quotaprobe); absent when never probed."
+          required: [remaining, checked_at]
+          properties:
+            remaining: { type: number, description: "Fraction 0..1, -1 when unknown. 0 keeps the credential out until reset_at." }
+            left: { type: number, description: "Amount left in the upstream's unit (credits, USD, requests); absent when not reported." }
+            limit: { type: number, description: "Amount the limit allows; absent when not reported." }
+            reset_at: { type: string, format: date-time }
+            checked_at: { type: string, format: date-time }
+            error: { type: string, description: "Why the last probe failed; the figures are from the last one that worked." }
+        attention:
+          type: object
+          description: "Something an operator should look at although the credential stays in rotation, e.g. a refreshed secret the store could not save."
+          required: [reason, since]
+          properties:
+            reason: { type: string }
+            since: { type: string, format: date-time }
+        recent_errors:
+          type: array
+          items:
+            type: object
+            required: [time, message]
+            properties:
+              time: { type: string, format: date-time }
+              status: { type: integer }
+              cause: { $ref: "#/components/schemas/Cause" }
+              message: { type: string }
+              request_id: { type: string }
+    Credential:
+      type: object
+      required: [id, upstream_id, label, kind, secret_hint, state]
+      properties:
+        id: { type: string }
+        upstream_id: { type: string }
+        label: { type: string }
+        kind: { type: string, enum: [shared, personal, service] }
+        owner: { $ref: "#/components/schemas/Ref", description: "Personal credentials only serve their owner." }
+        secret_hint: { type: string, description: "Masked, e.g. \"sk-••••a41c\". The secret is never returned." }
+        proxy: { type: string, description: "Fixed egress; empty = direct." }
+        max_concurrency: { type: integer }
+        enabled: { type: boolean }
+        expires_at: { type: ["string", "null"], format: date-time }
+        state: { $ref: "#/components/schemas/CredentialState" }
+    CredentialInput:
+      type: object
+      required: [label, kind, secret]
+      properties:
+        label: { type: string, minLength: 1 }
+        kind: { type: string, enum: [shared, personal, service] }
+        owner_id: { type: string }
+        secret: { type: string, writeOnly: true }
+        proxy: { type: string }
+        max_concurrency: { type: integer, minimum: 0 }
+    CredentialPatch:
+      type: object
+      properties:
+        label: { type: string, minLength: 1 }
+        secret: { type: string, writeOnly: true, description: "Omit to keep the stored secret." }
+        proxy: { type: string }
+        max_concurrency: { type: integer, minimum: 0 }
+        enabled: { type: boolean }
+    Upstream:
+      type: object
+      required: [id, name, provider, enabled, endpoints, source, circuit, stats, credentials, key_optional]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        provider: { type: string, description: "Provider plugin id.", examples: [provider.anthropic, provider.openai-compatible] }
+        type_label: { type: string, description: "Upstream type shown to users when names are hidden.", examples: [Anthropic] }
+        enabled: { type: boolean }
+        tags: { type: array, items: { type: string } }
+        endpoints: { type: array, items: { $ref: "#/components/schemas/Endpoint" } }
+        headers: { type: object, additionalProperties: { type: string }, description: "Extra request headers. Never sent under a name the provider owns (auth, account selectors)." }
+        proxy: { type: string, description: "Egress of credentials that set no proxy of their own; empty = direct." }
+        timeouts:
+          type: object
+          description: "Overrides of the relay's egress timeouts; 0 or absent keeps the default."
+          properties:
+            connect_ms: { type: integer, description: "Getting a connection (dial, proxy, TLS); capped by the 10 s dial and handshake limits." }
+            first_byte_ms: { type: integer }
+            idle_ms: { type: integer }
+            total_ms: { type: integer }
+        config: { type: object, additionalProperties: true, description: "Manifest variables by name (see `/manifests`) and the issuer override." }
+        source: { $ref: "#/components/schemas/ManifestSource" }
+        circuit: { $ref: "#/components/schemas/CircuitState" }
+        stats: { $ref: "#/components/schemas/UpstreamStats" }
+        credentials: { type: array, items: { $ref: "#/components/schemas/Credential" } }
+        key_optional: { type: boolean, description: "The manifest lets the server run without a key: with no credentials the upstream is routed with no auth. Any other upstream with no credentials is not routed." }
+        scheduled_test: { type: ["string", "null"], description: "Interval like \"15m\"; null = off." }
+        quota_probe: { type: ["string", "null"], description: "Interval like \"15m\" between quota probes of this upstream's credentials, or \"off\" (or \"0\"); null = job.quotaprobe's interval." }
+        model_sync: { type: ["boolean", "null"], description: "Whether model sync pulls this upstream's model list; null = the default, on when its manifest lists models." }
+    UpstreamInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        provider: { type: string }
+        manifest: { type: string, description: "Create from this manifest name." }
+        enabled: { type: boolean }
+        tags: { type: array, items: { type: string } }
+        endpoints: { type: array, items: { $ref: "#/components/schemas/Endpoint" } }
+        headers: { type: object, additionalProperties: { type: string }, description: "Credential, framing, hop-by-hop and client-address header names are rejected." }
+        proxy: { type: string, description: "http, https, socks5 or socks5h URL; empty = direct." }
+        timeouts:
+          type: object
+          properties:
+            connect_ms: { type: integer, minimum: 0 }
+            first_byte_ms: { type: integer }
+            idle_ms: { type: integer }
+            total_ms: { type: integer }
+        config: { type: object, additionalProperties: true }
+        scheduled_test: { type: ["string", "null"] }
+        quota_probe: { type: ["string", "null"], description: "At least 1m, or \"off\" (or \"0\"); null or empty = the job's interval." }
+        model_sync: { type: boolean, description: "Turn model sync on or off for this upstream." }
+    Manifest:
+      type: object
+      required: [name, title, category, kind, protocols, key_optional]
+      properties:
+        name: { type: string }
+        title: { type: string }
+        title_zh: { type: string, description: "Title in the Chinese console; absent = title." }
+        category:
+          type: string
+          enum: [vendor, cloud, inference, gateway, self_hosted, custom]
+          description: "Gallery group: model makers, cloud platforms, inference hosts, gateways, self-hosted servers; custom = a generic or local manifest without one."
+        kind: { type: string, enum: [official, file] }
+        key_optional: { type: boolean, description: "The server may run without a key (manifest auth.key_optional)." }
+        version: { type: string }
+        protocols: { type: array, items: { type: string } }
+        docs_url: { type: string }
+        variables:
+          type: array
+          description: Values an upstream from this manifest sets under `config.<name>` (the CLI's `upstream add --var`).
+          items: { $ref: "#/components/schemas/ManifestVariable" }
+    ManifestVariable:
+      type: object
+      required: [name, required]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        description_zh: { type: string }
+        default: { type: string }
+        required: { type: boolean, description: "The manifest requires it and gives no default." }
+
+    # ---------------------------------------------------------------- models & pricing
+    Route:
+      type: object
+      required: [upstream_id, upstream_model, priority, weight]
+      properties:
+        upstream_id: { type: string }
+        upstream_model: { type: string }
+        priority: { type: integer, description: "Higher is tried first." }
+        weight: { type: integer, minimum: 0, description: "Share among routes of equal priority." }
+        groups: { type: array, items: { type: string }, description: "Only keys in these groups may use this route; empty = all." }
+    Model:
+      type: object
+      required: [id, name, enabled, routes]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        enabled: { type: boolean }
+        disabled_reason: { type: string, enum: [manual, upstream_gone] }
+        info: { $ref: "#/components/schemas/ModelInfo" }
+        routes: { type: array, items: { $ref: "#/components/schemas/Route" } }
+        synced_at: { type: ["string", "null"], format: date-time }
+    ModelInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        enabled: { type: boolean }
+        info: { $ref: "#/components/schemas/ModelInfo" }
+        routes: { type: array, items: { $ref: "#/components/schemas/Route" } }
+    PresetStrategy:
+      type: string
+      enum: [in_order, cheapest, fastest]
+      description: "in_order: the first model with a usable route; cheapest: lowest upstream price first; fastest: lowest recent time to first byte first."
+    Preset:
+      type: object
+      description: One client-facing name served by one of several models. Clients see it in their model list; the relay only serves one of its models when a client asks for the preset by name.
+      required: [name, models, strategy]
+      properties:
+        name: { type: string }
+        models: { type: array, items: { type: string }, description: "Candidate models in preference order." }
+        strategy: { $ref: "#/components/schemas/PresetStrategy" }
+    PresetInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, description: "Required on create; never a model's name." }
+        models: { type: array, minItems: 1, items: { type: string } }
+        strategy: { $ref: "#/components/schemas/PresetStrategy" }
+    SyncResult:
+      type: object
+      required: [added, disabled, unchanged, failed]
+      properties:
+        added: { type: array, items: { type: string } }
+        disabled: { type: array, items: { type: string } }
+        unchanged: { type: integer }
+        failed:
+          type: array
+          items:
+            type: object
+            required: [upstream_id, error]
+            properties:
+              upstream_id: { type: string }
+              error: { type: string }
+    TokenPrices:
+      type: object
+      description: Price per one million tokens for each usage bucket.
+      required: [currency, input, cache_read, cache_write_5m, cache_write_1h, output]
+      properties:
+        currency: { type: string }
+        input: { type: integer, format: int64, description: "Micro-units per million tokens." }
+        cache_read: { type: integer, format: int64 }
+        cache_write_5m: { type: integer, format: int64 }
+        cache_write_1h: { type: integer, format: int64 }
+        output: { type: integer, format: int64 }
+        units:
+          type: object
+          description: >-
+            Media unit prices in micro-units per unit: "image" (per image generated),
+            "image:<size>" or "image:<size>:<quality>" (more specific wins),
+            "audio_second" (per second of input audio), "1k_chars" (per 1000 input characters),
+            "search_unit" (per rerank search unit).
+          additionalProperties: { type: integer, format: int64 }
+        batch_discount:
+          type: number
+          minimum: 0
+          exclusiveMaximum: 1
+          description: Fraction taken off usage served through a batch API (0.5 = half price); 0 or absent charges batches at full price.
+      example: { currency: USD, input: 1250000, cache_read: 125000, cache_write_5m: 1562500, cache_write_1h: 2500000, output: 10000000 }
+    PricingRule:
+      type: object
+      required: [id, match, prices, source, pending]
+      properties:
+        id: { type: string }
+        match: { type: string, description: "Model name or glob.", examples: ["gpt-5.5", "claude-sonnet-*"] }
+        prices: { $ref: "#/components/schemas/TokenPrices" }
+        source: { type: string, enum: [manual, pricesync], description: "pricesync = taken from models.dev; editing it makes it manual." }
+        updated_at: { type: string, format: date-time }
+        follow: { type: boolean, description: "On a model's own rule once price sync found the model: whether new catalog prices apply by themselves." }
+    PricingRuleInput:
+      type: object
+      properties:
+        match: { type: string, minLength: 1 }
+        prices: { $ref: "#/components/schemas/TokenPrices" }
+    PriceSuggestion:
+      type: object
+      required: [model, ref, prices, follow, fetched_at, hints]
+      properties:
+        model: { type: string }
+        ref: { type: string, description: "The models.dev entry, <provider>/<model>.", examples: ["anthropic/claude-sonnet-4-6"] }
+        prices: { $ref: "#/components/schemas/TokenPrices" }
+        current: { $ref: "#/components/schemas/TokenPrices", description: "What the model is charged now; absent when it has no price." }
+        current_rule: { type: string, description: "Id of the rule charging it now (its own or a pattern)." }
+        follow: { type: boolean }
+        fetched_at: { type: string, format: date-time }
+        hints:
+          type: object
+          required: [reasoning, vision, tools]
+          properties:
+            context_window: { type: integer }
+            max_output: { type: integer }
+            reasoning: { type: boolean }
+            vision: { type: boolean }
+            tools: { type: boolean }
+    PriceSyncStatus:
+      type: object
+      required: [enabled, matched]
+      properties:
+        enabled: { type: boolean, description: "Whether the price sync feature is on." }
+        ran_at: { type: string, format: date-time }
+        matched: { type: integer, description: "Models found in the catalog on the last check." }
+        error_code: { type: string, enum: [no_rate, download, failed], description: "no_rate = the site currency is not USD and no exchange rate is set." }
+        error: { type: string, description: "The last check's error, verbatim (English)." }
+
+    # ---------------------------------------------------------------- request logs
+    LogSummary:
+      type: object
+      required: [id, time, model, status, stream, attempts, charge, ttfb_ms, duration_ms, client]
+      properties:
+        id: { type: string }
+        time: { type: string, format: date-time }
+        protocol: { type: string, description: "Client protocol." }
+        model: { type: string, description: "What the client asked for." }
+        served_model: { type: string, description: "Model that served it; differs from model when the client asked for a preset." }
+        upstream_model: { type: string }
+        key: { $ref: "#/components/schemas/Ref" }
+        user: { $ref: "#/components/schemas/Ref" }
+        upstream: { $ref: "#/components/schemas/Ref", description: "Name may be the type only when names are hidden." }
+        status: { type: integer }
+        error_kind: { $ref: "#/components/schemas/ErrorKind" }
+        cause: { $ref: "#/components/schemas/Cause" }
+        tier: { $ref: "#/components/schemas/Tier" }
+        stream: { type: boolean }
+        attempts: { type: integer }
+        cache_hit_rate: { type: ["number", "null"] }
+        ttfb_ms: { type: ["integer", "null"] }
+        duration_ms: { type: integer }
+        charge: { $ref: "#/components/schemas/Money" }
+        client: { $ref: "#/components/schemas/RequestClient" }
+        client_ip: { type: string }
+        resent: { type: boolean, description: "A client resend of an earlier request." }
+    LogHistogram:
+      type: object
+      required: [from, to, bucket_seconds, points]
+      properties:
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        bucket_seconds: { type: integer }
+        points:
+          type: array
+          items:
+            type: object
+            required: [t, requests, failed]
+            properties:
+              t: { type: string, format: date-time, description: "Bucket start." }
+              requests: { type: integer, format: int64 }
+              failed: { type: integer, format: int64, description: "Requests without a 2xx status." }
+    RequestClient:
+      type: object
+      description: The client program, recognised from the request headers (pkg/clientid).
+      required: [id]
+      properties:
+        id: { type: string, description: "claude-code, codex, gemini-cli, cursor, cline, opencode, roo, kilo, continue, zed, curl, sdk-python, sdk-node or other." }
+        name: { type: string, description: "Display name; absent for other." }
+        version: { type: string }
+    Session:
+      type: object
+      required: [id, first, last, requests, failed, client, models, charge, cache_hit_rate]
+      properties:
+        id: { type: string }
+        first: { type: string, format: date-time }
+        last: { type: string, format: date-time }
+        requests: { type: integer, format: int64 }
+        failed: { type: integer, format: int64 }
+        key: { $ref: "#/components/schemas/Ref" }
+        user: { $ref: "#/components/schemas/Ref" }
+        client: { $ref: "#/components/schemas/RequestClient" }
+        models: { type: array, items: { type: string }, description: "Most used first." }
+        charge: { $ref: "#/components/schemas/Money" }
+        cache_hit_rate: { type: ["number", "null"] }
+    SessionPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Session" } }
+        next_cursor: { type: ["string", "null"] }
+    LogPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/LogSummary" } }
+        next_cursor: { type: ["string", "null"] }
+    Attempt:
+      type: object
+      required: [n, upstream, tier, status, sent, start_ms, duration_ms, usage, cost, charged]
+      properties:
+        n: { type: integer }
+        upstream: { $ref: "#/components/schemas/Ref" }
+        endpoint_id: { type: string }
+        credential: { $ref: "#/components/schemas/Ref", description: "Admins only." }
+        protocol: { type: string }
+        upstream_model: { type: string }
+        tier: { $ref: "#/components/schemas/Tier" }
+        status: { type: integer }
+        cause: { $ref: "#/components/schemas/Cause" }
+        sent: { type: boolean }
+        start_ms: { type: integer, description: "Offset from request start." }
+        ttfb_ms: { type: ["integer", "null"] }
+        duration_ms: { type: integer }
+        usage: { $ref: "#/components/schemas/Usage" }
+        cost: { $ref: "#/components/schemas/Money" }
+        charged: { type: boolean, description: "Whether the caller pays for this attempt." }
+        credential_action: { type: string, description: "What happened to the credential, e.g. \"cooldown 60s\"." }
+        diagnostic: { $ref: "#/components/schemas/Diagnostic" }
+        error: { type: string, description: "Upstream error text verbatim." }
+        bytes_in: { type: integer, format: int64, description: "Request body bytes sent upstream; native passthrough only." }
+        bytes_out: { type: integer, format: int64, description: "Response body bytes relayed; native passthrough only." }
+    Diagnostic:
+      type: object
+      required: [fidelity]
+      properties:
+        fidelity: { $ref: "#/components/schemas/Fidelity" }
+        steps: { type: array, items: { type: string } }
+        dropped: { type: array, items: { type: string } }
+        missing: { type: array, items: { type: string } }
+        notes: { type: array, items: { type: string } }
+    BillingLine:
+      type: object
+      required: [bucket, tokens, unit_price, amount]
+      properties:
+        bucket: { type: string, enum: [input, cache_read, cache_write_5m, cache_write_1h, output] }
+        tokens: { type: integer, format: int64 }
+        unit_price: { $ref: "#/components/schemas/Money", description: "Per million tokens, as charged (group multiplier included)." }
+        amount: { $ref: "#/components/schemas/Money" }
+    Billing:
+      type: object
+      required: [lines, charged, cost]
+      properties:
+        lines: { type: array, items: { $ref: "#/components/schemas/BillingLine" } }
+        reserved: { $ref: "#/components/schemas/Money" }
+        refunded: { $ref: "#/components/schemas/Money" }
+        charged: { $ref: "#/components/schemas/Money" }
+        cost: { $ref: "#/components/schemas/Money", description: "Operator cost across all sent attempts; admins only." }
+        multiplier: { type: number, description: "Group price multiplier already included in the unit prices; admins only." }
+        rule_id: { type: string }
+        note: { type: string, enum: [no_price, estimated], description: "no_price = no price rule matched, nothing charged; estimated = the upstream reported no usage, counts are estimates." }
+    LogDetail:
+      allOf:
+        - $ref: "#/components/schemas/LogSummary"
+        - type: object
+          required: [attempts_detail, usage, billing]
+          properties:
+            session_id: { type: string }
+            session:
+              type: object
+              description: The whole session this request belongs to (an end user's own requests only).
+              required: [requests, turn, charge, first, last]
+              properties:
+                requests: { type: integer, format: int64 }
+                turn: { type: integer, format: int64, description: "Position of this request in the session, from 1." }
+                charge: { $ref: "#/components/schemas/Money" }
+                first: { type: string, format: date-time }
+                last: { type: string, format: date-time }
+            client_ua: { type: string }
+            error: { type: string }
+            attempts_detail: { type: array, items: { $ref: "#/components/schemas/Attempt" } }
+            usage: { $ref: "#/components/schemas/Usage" }
+            billing: { $ref: "#/components/schemas/Billing" }
+            has_body: { type: boolean }
+            body:
+              type: object
+              description: Stored request and response bodies, present when body logging was on for the request.
+              properties:
+                request: { description: "Request body as sent by the client." }
+                response: { description: "Response body (or the collected stream)." }
+
+    # ---------------------------------------------------------------- features
+    PluginKind:
+      type: string
+      enum: [provider, auth, middleware, selector, meter, sink, job, admin]
+    PluginPermission:
+      type: object
+      required: [id, api]
+      properties:
+        id: { type: string }
+        api: { type: string, description: "Host API the plugin may call.", examples: ["host.kv"] }
+        reason: { type: string }
+    ReloadError:
+      type: string
+      description: Why the last configuration reload failed; the relay keeps running the configuration before it until a reload applies. Absent when the last reload applied.
+    SettingScope:
+      type: string
+      enum: [global, group, user, key]
+    Setting:
+      type: object
+      description: One setting of one module, for a form. Show `label` and `help`, never `module` or `key`.
+      required: [module, key, type, label, help, scopes, merge, value]
+      properties:
+        module: { type: string }
+        key: { type: string }
+        type: { type: string, enum: [string, int, float, bool, duration, list, secret, model, upstream, group, json] }
+        label: { $ref: "#/components/schemas/LocalizedText" }
+        help: { $ref: "#/components/schemas/LocalizedText" }
+        unit: { type: string, enum: [money], description: "money: default, value and effective are in currency units of the site currency." }
+        enum: { type: array, items: { type: string } }
+        enum_labels: { type: object, additionalProperties: { $ref: "#/components/schemas/LocalizedText" } }
+        default: {}
+        scopes: { type: array, items: { $ref: "#/components/schemas/SettingScope" } }
+        merge: { type: string, enum: [override, strictest, union] }
+        restart: { type: boolean, description: "Takes effect after a restart." }
+        value: { description: "What the layer shown stores; null when unset, and always for a secret." }
+        secret_set: { type: boolean }
+        invalid: { type: boolean, description: "The stored value does not fit the setting (only a hand-edited database holds one): a strictest list then allows nothing, a union list keeps its valid entries, any other setting ignores it. Saving a valid value fixes it." }
+        feature: { type: string, description: "Layer settings only: the feature it belongs to; absent for core modules and extensions." }
+        effective:
+          type: object
+          description: Layer settings only — the merged value the layer's callers get and the layer it came from.
+          required: [source]
+          properties:
+            value: {}
+            source: { type: string, enum: [default, global, group, user, key] }
+            secret_set: { type: boolean }
+            layers:
+              type: array
+              description: A strictest list set on more than one layer, each layer's own list in merge order; every one must allow an entry, and `value` is their common entries.
+              items:
+                type: object
+                required: [source, value]
+                properties:
+                  source: { type: string, enum: [global, group, user, key] }
+                  value: { type: array, items: { type: string } }
+            denied_by:
+              type: string
+              enum: [global, group, user, key]
+              description: The layer after which no entry is common to every layer, so the list denies everything.
+    SettingValues:
+      type: object
+      description: 'New values by module, then key, e.g. `{"middleware.ratelimit": {"rpm": 60}}`; money in currency units; `null` removes a value.'
+      additionalProperties: { type: object, additionalProperties: true }
+    LayerSettings:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Setting" } }
+    Feature:
+      type: object
+      required: [id, name, description, enabled, default, modules, settings, pages]
+      properties:
+        id: { type: string, examples: [limits, routing, request_log, content_safety, billing, signup, sso, mcp, metrics] }
+        name: { $ref: "#/components/schemas/LocalizedText" }
+        description: { $ref: "#/components/schemas/LocalizedText" }
+        enabled: { type: boolean }
+        default: { type: boolean, description: "The state with nothing stored." }
+        always_on: { type: boolean, description: "No switch, only settings." }
+        modules:
+          type: array
+          description: The built-in plugins that run while it is on.
+          items:
+            type: object
+            required: [id, status]
+            properties:
+              id: { type: string }
+              status: { type: string, enum: [running, stopped, crashed, missing] }
+              status_detail: { type: string }
+        settings: { type: array, items: { $ref: "#/components/schemas/Setting" }, description: "Its form, global layer." }
+        pages: { type: array, items: { type: string }, description: "Console page ids it adds." }
+    Extension:
+      type: object
+      required: [id, kind, version, title, source, enabled, order, status, permissions, settings]
+      properties:
+        id: { type: string }
+        kind: { $ref: "#/components/schemas/PluginKind" }
+        version: { type: string }
+        title: { type: string }
+        description: { type: string }
+        source: { type: string, enum: [builtin, external], description: "builtin = linked into this build; external = a separate process." }
+        enabled: { type: boolean }
+        order: { type: integer }
+        status: { type: string, enum: [running, stopped, crashed, needs_approval] }
+        status_detail: { type: string }
+        permissions: { type: array, items: { $ref: "#/components/schemas/PluginPermission" } }
+        approved_permissions: { type: array, items: { type: string } }
+        settings: { type: array, items: { $ref: "#/components/schemas/Setting" }, description: "Its global layer." }
+    LocalizedText:
+      type: object
+      required: [en]
+      properties:
+        en: { type: string }
+        zh-CN: { type: string }
+
+    # ---------------------------------------------------------------- settings & audit & search
+    SettingItem:
+      type: object
+      required: [key, section, type, value, apply, source, title, help]
+      properties:
+        key: { type: string, examples: [site.name, security.local_owner_login] }
+        section: { type: string, examples: [general, branding, logging, security, network] }
+        type: { type: string, enum: [string, int, float, bool, duration, list, secret, json, markdown] }
+        value: { description: "Current value; null for secrets." }
+        default: {}
+        enum: { type: array, items: { type: string } }
+        apply:
+          type: string
+          enum: [live, restart, file]
+          description: live = takes effect immediately; restart = after a restart; file = comes from relay.yaml, read-only here.
+        source: { type: string, enum: [default, database, file] }
+        pending_restart: { type: boolean, description: "Saved but not yet in effect." }
+        enum_labels: { type: object, additionalProperties: { $ref: "#/components/schemas/LocalizedText" } }
+        title: { $ref: "#/components/schemas/LocalizedText" }
+        help: { $ref: "#/components/schemas/LocalizedText" }
+    AuditEntry:
+      type: object
+      required: [id, time, actor, action, target]
+      properties:
+        id: { type: string }
+        time: { type: string, format: date-time }
+        actor: { $ref: "#/components/schemas/Ref" }
+        action: { type: string, examples: [key.create, upstream.update, credential.reset, feature.enable, settings.update] }
+        target:
+          type: object
+          required: [type, id]
+          properties:
+            type: { type: string }
+            id: { type: string }
+            name: { type: string }
+        ip: { type: string }
+        changes:
+          type: array
+          items:
+            type: object
+            required: [field]
+            properties:
+              field: { type: string }
+              from: {}
+              to: {}
+    AuditPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/AuditEntry" } }
+        next_cursor: { type: ["string", "null"] }
+    SearchHit:
+      type: object
+      required: [type, id, title]
+      properties:
+        type: { type: string, enum: [key, upstream, request, user, model, feature, extension] }
+        id: { type: string }
+        title: { type: string }
+        subtitle: { type: string }
+
+    # ---------------------------------------------------------------- single sign-on
+    SsoPreset:
+      type: string
+      enum: [oidc, google, microsoft, keycloak, authentik, github, feishu, lark]
+    AuthProviders:
+      type: object
+      required: [password_login, providers, site]
+      properties:
+        password_login: { type: boolean }
+        site:
+          type: object
+          description: Whose relay this is, for the login page.
+          required: [name]
+          properties:
+            name: { type: string }
+            logo_url: { type: string }
+        public_pages:
+          type: object
+          description: Present while the public pages feature is on, for links from the login page.
+          required: [models, status]
+          properties:
+            models: { type: boolean }
+            status: { type: boolean }
+        captcha:
+          type: object
+          description: Present when the password login asks for a captcha after repeated failures.
+          required: [provider, site_key, after_failures]
+          properties:
+            provider: { type: string, enum: [turnstile, hcaptcha] }
+            site_key: { type: string }
+            after_failures: { type: integer }
+        providers:
+          type: array
+          items:
+            type: object
+            required: [id, name, preset]
+            properties:
+              id: { type: string }
+              name: { type: string }
+              preset: { $ref: "#/components/schemas/SsoPreset" }
+    SsoGroupRule:
+      type: object
+      description: Set either domain (of a verified email) or claim + value. The first match wins. GitHub allows domain rules only, Feishu/Lark domain or tenant_key; their other claims are user-editable.
+      required: [group_id]
+      properties:
+        domain: { type: string }
+        claim: { type: string }
+        value: { type: string }
+        group_id: { type: string }
+    SsoProviderInput:
+      type: object
+      properties:
+        id: { type: string, pattern: "^[a-z0-9][a-z0-9-]{0,31}$", description: "Fixed once created; part of the redirect URI." }
+        name: { type: string }
+        preset: { $ref: "#/components/schemas/SsoPreset" }
+        enabled: { type: boolean, default: true }
+        issuer: { type: string, description: "OIDC issuer URL (oidc, keycloak, authentik). Changing it, the tenant or the client id unlinks every identity of this provider." }
+        tenant: { type: string, description: "Entra tenant id, verified domain or organizations (microsoft)." }
+        client_id: { type: string }
+        client_secret: { type: string, writeOnly: true, description: "Sealed with the master key; required on create." }
+        scopes: { type: array, items: { type: string } }
+        allowed_domains: { type: array, items: { type: string }, description: "Only verified emails in these domains may sign in." }
+        allowed_tenants: { type: array, items: { type: string }, description: "Entra tid or Feishu/Lark tenant_key allowlist." }
+        auto_create: { type: boolean, description: "Create a user on first sign-in." }
+        default_role: { type: string, enum: [user, member] }
+        default_group_id: { type: string }
+        group_rules: { type: array, items: { $ref: "#/components/schemas/SsoGroupRule" } }
+        link_by_email: { type: boolean, description: "Link to an existing user with the same verified email. Admin accounts are skipped unless link_admins is on." }
+        link_admins: { type: boolean, description: "Let link_by_email link admin accounts too." }
+        trust_email: { type: boolean, description: "Treat the provider's email as verified when it does not say; an explicit email_verified=false still wins. Feishu/Lark require allowed_tenants with it." }
+    McpServerInput:
+      type: object
+      properties:
+        id: { type: string, pattern: "^[a-z0-9][a-z0-9-]{0,31}$", description: "Set on create; appears in /mcp/<id> and in aggregated tool names <id>__<tool>." }
+        name: { type: string }
+        url: { type: string, description: "The server's MCP endpoint (Streamable HTTP) or SSE endpoint." }
+        transport: { type: string, enum: [auto, streamable-http, sse], default: auto }
+        enabled: { type: boolean, default: true }
+        headers: { type: object, additionalProperties: { type: string }, description: "Sent as is; replaces the stored set." }
+        secret_headers: { type: object, additionalProperties: { type: string }, writeOnly: true, description: "Credentials (Authorization, X-Api-Key…), sealed at rest; an empty value removes that header." }
+        tools_allow: { type: array, items: { type: string }, description: "Tool names or glob patterns everyone may use; empty = all." }
+        tools_deny: { type: array, items: { type: string } }
+        proxy: { type: string, description: "Fixed egress proxy URL; empty = direct." }
+        allow_private: { type: boolean, description: "Allow a private or loopback address." }
+        timeout_sec: { type: integer, minimum: 0, maximum: 3600, description: "Per-call timeout; 0 = 120 s." }
+    McpServer:
+      type: object
+      required: [id, url, transport, enabled, secret_headers]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        url: { type: string }
+        transport: { type: string, enum: [auto, streamable-http, sse] }
+        enabled: { type: boolean }
+        headers: { type: object, additionalProperties: { type: string } }
+        secret_headers: { type: array, items: { type: string }, description: "Names of the secret headers set." }
+        tools_allow: { type: array, items: { type: string } }
+        tools_deny: { type: array, items: { type: string } }
+        proxy: { type: string }
+        allow_private: { type: boolean }
+        timeout_sec: { type: integer }
+    McpTestResult:
+      type: object
+      required: [ok, tools, latency_ms]
+      properties:
+        ok: { type: boolean }
+        transport: { type: string, description: "streamable-http, sse, or 2026-07-28 for a modern stateless server." }
+        protocol_version: { type: string }
+        server_info: { type: object, additionalProperties: true }
+        tools: { type: array, items: { type: string } }
+        latency_ms: { type: integer }
+        error: { type: string }
+    NotifyEvent:
+      type: string
+      enum: [credential_quarantined, credential_cooling, credential_quota_low, credential_secret_unsaved, upstream_paused, upstream_recovered, budget_reached, extension_crashed]
+    NotifyChannelType:
+      type: string
+      enum: [email, feishu, dingtalk, wecom, webhook]
+    NotifyChannelInput:
+      type: object
+      description: Fields of other channel types are ignored. Secrets (url, secret, password) are sealed with the master key and never returned.
+      properties:
+        type: { $ref: "#/components/schemas/NotifyChannelType", description: "Required on create; fixed afterwards." }
+        name: { type: string, minLength: 1, maxLength: 64 }
+        enabled: { type: boolean, description: "On when created without it." }
+        events: { type: array, items: { $ref: "#/components/schemas/NotifyEvent" }, description: "Empty = every event." }
+        language: { type: string, enum: [zh-CN, en], description: "zh-CN when created without it." }
+        url: { type: string, writeOnly: true, description: "Bot or webhook address (Feishu/Lark, DingTalk, WeCom, webhook)." }
+        secret: { type: string, writeOnly: true, description: "Signing secret (Feishu/Lark, DingTalk) or the webhook's HMAC key; empty removes it." }
+        smtp_host: { type: string }
+        smtp_port: { type: integer, minimum: 0, maximum: 65535, description: "0 = 465 for tls, 25 for none, else 587." }
+        tls: { type: string, enum: [starttls, tls, none], description: "starttls when empty." }
+        username: { type: string }
+        password: { type: string, writeOnly: true }
+        from: { type: string }
+        to: { type: array, items: { type: string } }
+        records: { type: boolean, description: "Webhook only: also post finished request records, best effort." }
+        record_fields: { type: array, items: { type: string }, description: "Record fields to post; empty = every field but body." }
+    NotifyChannel:
+      type: object
+      required: [id, name, type, enabled, events, language, has_secret, has_password, to, records, record_fields, created_at, updated_at]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        type: { $ref: "#/components/schemas/NotifyChannelType" }
+        enabled: { type: boolean }
+        events: { type: array, items: { $ref: "#/components/schemas/NotifyEvent" } }
+        language: { type: string, enum: [zh-CN, en] }
+        url: { type: string, description: "The address with its token masked." }
+        has_secret: { type: boolean }
+        has_password: { type: boolean }
+        smtp_host: { type: string }
+        smtp_port: { type: integer }
+        tls: { type: string, enum: [starttls, tls, none] }
+        username: { type: string }
+        from: { type: string }
+        to: { type: array, items: { type: string } }
+        records: { type: boolean }
+        record_fields: { type: array, items: { type: string } }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    NotifyTestResult:
+      type: object
+      required: [ok, attempts, latency_ms]
+      properties:
+        ok: { type: boolean }
+        error: { type: string }
+        attempts: { type: integer }
+        latency_ms: { type: integer }
+    NotifyObject:
+      type: object
+      required: [type, id]
+      properties:
+        type: { type: string, enum: [credential, upstream, key, user, group, extension, channel] }
+        id: { type: string }
+        name: { type: string }
+        parent_id: { type: string, description: "A credential's upstream." }
+        parent_name: { type: string }
+        detail: { type: object, additionalProperties: { type: string }, description: "reason, until, percent, window, kind, error…" }
+    NotifyDelivery:
+      type: object
+      required: [channel_id, channel_name, channel_type, ok, attempts, at]
+      properties:
+        channel_id: { type: string }
+        channel_name: { type: string }
+        channel_type: { $ref: "#/components/schemas/NotifyChannelType" }
+        ok: { type: boolean }
+        error: { type: string }
+        attempts: { type: integer }
+        at: { type: string, format: date-time }
+    Notification:
+      type: object
+      required: [id, created_at, event, status, objects, deliveries]
+      properties:
+        id: { type: string }
+        created_at: { type: string, format: date-time }
+        event: { type: string, description: "A NotifyEvent, or test." }
+        status: { type: string, enum: [pending, done] }
+        objects: { type: array, items: { $ref: "#/components/schemas/NotifyObject" } }
+        deliveries: { type: array, items: { $ref: "#/components/schemas/NotifyDelivery" }, description: "Empty when no channel takes the event." }
+    SsoProvider:
+      allOf:
+        - $ref: "#/components/schemas/SsoProviderInput"
+        - type: object
+          required: [id, name, preset, enabled, client_id, has_client_secret, auto_create, link_by_email, trust_email]
+          properties:
+            has_client_secret: { type: boolean }
+            redirect_uri: { type: string, description: "Register this at the provider. Absent until a public URL is known." }
+    SsoProviders:
+      type: object
+      required: [items, presets]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/SsoProvider" } }
+        presets: { type: array, items: { $ref: "#/components/schemas/SsoPreset" } }
+        redirect_base: { type: string }
+        redirect_problem: { type: string, description: "Why no redirect URI can be built (no public URL on a relay reachable from other machines)." }
+    Identity:
+      type: object
+      required: [id, provider, provider_name, subject, user_id]
+      properties:
+        id: { type: string }
+        provider: { type: string }
+        provider_name: { type: string }
+        subject: { type: string }
+        user_id: { type: string }
+        email: { type: string }
+        created_at: { type: string, format: date-time }
+        last_login_at: { type: string, format: date-time }

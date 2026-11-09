@@ -1,0 +1,32 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.nscale.com/api-reference/inference/create-chat-completion
+#   https://docs.nscale.com/docs/faqs/error-codes
+id: nscale
+kind: provider
+name: Nscale
+category: inference
+homepage: https://docs.nscale.com
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://inference.api.nscale.com/v1
+    capabilities:
+      freeform_tools: false
+      reasoning: reasoning_content
+  # suffix is in the schema but its behaviour is undocumented.
+  - id: completions
+    protocol: openai-completions
+    base_url: https://inference.api.nscale.com/v1
+errors:
+  # Credit exhaustion is documented as a 429.
+  - when: {status: 429, message_contains: "nsufficient credit"}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+models:
+  list: /models

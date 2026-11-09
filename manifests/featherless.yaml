@@ -1,0 +1,30 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://featherless.ai/docs/api-overview-and-common-options
+#   https://featherless.ai/docs/api-reference-error-codes
+id: featherless
+kind: provider
+name: Featherless AI
+category: inference
+homepage: https://featherless.ai/docs
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api.featherless.ai/v1
+    capabilities:
+      freeform_tools: false
+  - id: completions
+    protocol: openai-completions
+    base_url: https://api.featherless.ai/v1
+errors:
+  # A model not yet loaded answers 400; another upstream may have it warm.
+  - when: {status: 400, message_contains: "Model is Cold"}
+    verdict: {cause: transient, credential: keep, retry: next}
+models:
+  list: /models

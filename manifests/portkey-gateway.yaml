@@ -1,0 +1,53 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://github.com/Portkey-AI/gateway
+#   https://raw.githubusercontent.com/Portkey-AI/gateway/main/src/index.ts
+# The open-source Portkey gateway (npx @portkey-ai/gateway). The
+# credential secret is the provider's own key; set the credential's meta
+# key "provider" (openai, anthropic, groq, ...) to pick the provider.
+id: portkey-gateway
+kind: provider
+name: Portkey AI Gateway (self-hosted)
+name_zh: "Portkey AI 网关（自己部署）"
+category: gateway
+homepage: https://github.com/Portkey-AI/gateway
+interpreter: openai-compatible
+variables:
+  base_url:
+    default: http://localhost:8787/v1
+    description: OpenAI-compatible base URL of the gateway, including /v1.
+    description_zh: "网关的 OpenAI 兼容地址，带 /v1。"
+auth:
+  header: Authorization
+  scheme: Bearer
+owned_headers: [x-portkey-provider, x-portkey-config]
+credential_headers:
+  x-portkey-provider: provider
+capabilities:
+  cache: none
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: "{base_url}"
+    capabilities:
+      freeform_tools: false
+  - id: responses
+    protocol: openai-responses
+    base_url: "{base_url}"
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  - id: completions
+    protocol: openai-completions
+    base_url: "{base_url}"
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: "{base_url}"
+  - id: images
+    protocol: openai-images
+    base_url: "{base_url}"
+  - id: audio
+    protocol: openai-audio
+    base_url: "{base_url}"

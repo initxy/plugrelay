@@ -1,0 +1,35 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://github.com/michaelfeil/infinity
+#   https://raw.githubusercontent.com/michaelfeil/infinity/main/docs/assets/openapi.json
+#     (POST /rerank: string documents, results[].relevance_score)
+# Embedding server. Routes sit at the root unless started with
+# --url-prefix /v1; the model field picks among the served models.
+id: infinity
+kind: provider
+name: Infinity (embeddings server)
+name_zh: "Infinity（向量服务）"
+category: self_hosted
+homepage: https://github.com/michaelfeil/infinity
+interpreter: openai-compatible
+variables:
+  base_url:
+    default: http://localhost:7997
+    description: Base URL of the server, including --url-prefix if one is set.
+    description_zh: "服务地址；设置过 --url-prefix 的话要带上。"
+# Runs without a key unless started with --api-key; an empty credential
+# secret sends no Authorization header.
+auth:
+  key_optional: true
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+endpoints:
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: "{base_url}"
+  # Results carry document as a plain string when return_documents is set.
+  - protocol: rerank
+    base_url: "{base_url}"
+models:
+  list: /models

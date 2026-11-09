@@ -1,0 +1,43 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://github.com/ray-project/ray/blob/master/doc/source/serve/llm/quick-start.md
+#   https://github.com/ray-project/ray/blob/master/python/ray/llm/_internal/serve/core/ingress/ingress.py
+# build_openai_app over vLLM engines.
+id: ray-serve-llm
+kind: provider
+name: Ray Serve LLM
+category: self_hosted
+homepage: https://docs.ray.io/en/latest/serve/llm/index.html
+interpreter: openai-compatible
+variables:
+  base_url:
+    default: http://localhost:8000/v1
+    description: OpenAI-compatible base URL of the server, including /v1.
+    description_zh: "服务的 OpenAI 兼容地址，带 /v1。"
+# No built-in auth (put a gateway in front for keys); an empty credential
+# secret sends no Authorization header.
+auth:
+  key_optional: true
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: "{base_url}"
+    capabilities:
+      freeform_tools: false
+  - id: completions
+    protocol: openai-completions
+    base_url: "{base_url}"
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: "{base_url}"
+  # Transcriptions only.
+  - id: audio
+    protocol: openai-audio
+    base_url: "{base_url}"
+    capabilities:
+      speech: false
+models:
+  list: /models

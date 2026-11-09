@@ -1,0 +1,1 @@
+{"id":"cmpl-9f2","object":"text_completion","created":1730800000,"model":"gpt-3.5-turbo-instruct","system_fingerprint":"fp_1","choices":[{"text":" world","index":0,"logprobs":{"tokens":[" world"],"token_logprobs":[-0.12],"top_logprobs":[{" world":-0.12}],"text_offset":[5]},"finish_reason":"length"}],"usage":{"prompt_tokens":5,"completion_tokens":1,"total_tokens":6}}

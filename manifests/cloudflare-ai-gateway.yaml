@@ -1,0 +1,50 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://developers.cloudflare.com/ai-gateway/usage/chat-completion/
+#   https://developers.cloudflare.com/ai-gateway/usage/providers/openai/index.md
+#   https://developers.cloudflare.com/ai-gateway/usage/providers/anthropic/index.md
+#   https://developers.cloudflare.com/ai-gateway/reference/troubleshooting/index.md
+# The credential secret is the gateway's authentication token; provider
+# keys are stored in the gateway (BYOK) or billed by Cloudflare (Unified
+# Billing). Workers AI's own API is the cloudflare-workers-ai manifest.
+id: cloudflare-ai-gateway
+kind: provider
+name: Cloudflare AI Gateway
+name_zh: "Cloudflare AI 网关"
+category: gateway
+homepage: https://developers.cloudflare.com/ai-gateway/
+interpreter: openai-compatible
+variables:
+  account_id:
+    required: true
+    description: Cloudflare account ID.
+    description_zh: "Cloudflare 账号 ID。"
+  gateway_id:
+    default: default
+    description: Gateway name; "default" is created on first use.
+    description_zh: "网关名；填 default 的话第一次用时会自动创建。"
+auth:
+  header: cf-aig-authorization
+  scheme: Bearer
+owned_headers: [Authorization, x-api-key]
+capabilities:
+  cache: none
+endpoints:
+  # Cross-provider route: model is provider/model (openai/gpt-5-mini,
+  # anthropic/claude-sonnet-4-5).
+  - id: chat
+    protocol: openai-chat
+    base_url: https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/compat
+    capabilities:
+      freeform_tools: false
+  # OpenAI passthrough.
+  - id: responses
+    protocol: openai-responses
+    base_url: https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/openai
+  # Anthropic passthrough.
+  - protocol: anthropic
+    base_url: https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/anthropic
+    interpreter: anthropic-compatible
+errors:
+  # Out of Unified Billing credits or payment failed.
+  - when: {status: 402}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}

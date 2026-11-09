@@ -1,0 +1,66 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.deepinfra.com/chat/overview
+#   https://docs.deepinfra.com/integrations/anthropic
+#   https://docs.deepinfra.com/api-reference/responses/openai-responses
+#   https://docs.deepinfra.com/api-reference/models/openai-models
+#   https://docs.deepinfra.com/apis/embeddings.md
+#   https://docs.deepinfra.com/apis/image-generation.md
+#   https://docs.deepinfra.com/api-reference/audio/openai-audio-transcriptions.md
+id: deepinfra
+kind: provider
+name: DeepInfra
+category: inference
+homepage: https://docs.deepinfra.com
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api.deepinfra.com/v1/openai
+    interpreter: openai-compatible
+    capabilities:
+      freeform_tools: false
+      reasoning: reasoning_content
+  - id: responses
+    protocol: openai-responses
+    base_url: https://api.deepinfra.com/v1
+    interpreter: openai-compatible
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+      max_tokens_field: max_output_tokens
+  # No suffix parameter.
+  - id: completions
+    protocol: openai-completions
+    base_url: https://api.deepinfra.com/v1/openai
+    interpreter: openai-compatible
+  - protocol: anthropic
+    base_url: https://api.deepinfra.com/anthropic
+    interpreter: anthropic-compatible
+    capabilities:
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+  - id: embeddings
+    protocol: openai-embeddings
+    interpreter: openai-compatible
+    base_url: https://api.deepinfra.com/v1/openai
+  - id: images
+    protocol: openai-images
+    interpreter: openai-compatible
+    base_url: https://api.deepinfra.com/v1/openai
+  # The OpenAI-style audio routes sit under /v1, not /v1/openai.
+  - id: audio
+    protocol: openai-audio
+    interpreter: openai-compatible
+    base_url: https://api.deepinfra.com/v1
+models:
+  endpoint: responses
+  list: /models

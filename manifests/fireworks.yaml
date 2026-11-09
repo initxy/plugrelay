@@ -1,0 +1,58 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.fireworks.ai/tools-sdks/openai-compatibility
+#   https://docs.fireworks.ai/tools-sdks/anthropic-compatibility
+#   https://docs.fireworks.ai/guides/response-api
+#   https://docs.fireworks.ai/guides/inference-error-codes
+#   https://docs.fireworks.ai/guides/prompt-caching
+#   https://docs.fireworks.ai/api-reference/creates-an-embedding-vector-representing-the-input-text.md
+# Models are listed only by the per-account control-plane API.
+id: fireworks
+kind: provider
+name: Fireworks AI
+category: inference
+homepage: https://docs.fireworks.ai
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api.fireworks.ai/inference/v1
+    interpreter: openai-compatible
+    capabilities:
+      freeform_tools: false
+      reasoning: reasoning_content
+  - id: responses
+    protocol: openai-responses
+    base_url: https://api.fireworks.ai/inference/v1
+    interpreter: openai-compatible
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+      max_tokens_field: max_output_tokens
+  # Suffix is rejected.
+  - id: completions
+    protocol: openai-completions
+    base_url: https://api.fireworks.ai/inference/v1
+    interpreter: openai-compatible
+  # cache_control, server tools and document blocks are rejected; reads hit
+  # the automatic prefix cache.
+  - protocol: anthropic
+    base_url: https://api.fireworks.ai/inference
+    interpreter: anthropic-compatible
+    capabilities:
+      cache: implicit
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+      documents: false
+  - id: embeddings
+    protocol: openai-embeddings
+    interpreter: openai-compatible
+    base_url: https://api.fireworks.ai/inference/v1

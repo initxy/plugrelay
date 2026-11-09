@@ -1,0 +1,256 @@
+{
+  "model": "gpt-5.5",
+  "instructions": "You are a coding agent running in a terminal.",
+  "input": [
+    {
+      "type": "message",
+      "role": "developer",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "<permissions instructions>\nFilesystem sandboxing: workspace-write.\n</permissions instructions>"
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "# AGENTS.md instructions for /repo\n\nUse gofmt."
+        },
+        {
+          "type": "input_text",
+          "text": "<environment_context>\n  <cwd>/repo</cwd>\n</environment_context>"
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Add a hello file and check the weather in Paris."
+        },
+        {
+          "type": "input_image",
+          "image_url": "data:image/png;base64,iVBORw0KGgo=",
+          "detail": "high"
+        }
+      ]
+    },
+    {
+      "type": "reasoning",
+      "id": "rs_01d40c0df1be74f3006aec83fee6a481969938665e9b60892c",
+      "summary": [
+        {
+          "type": "summary_text",
+          "text": "**Planning**\n\nI will patch."
+        },
+        {
+          "type": "summary_text",
+          "text": "Then call the tool."
+        }
+      ],
+      "content": null,
+      "encrypted_content": "gAAAAABq7IQAwEsEFBrYA085wGA4I_oAqnM16Ej7mmAXJ7Za4Au8vU2-Wvc7ngEPe-JutbdcoqFzFH9uhM-vsgemybEp1CahxFrkA-6qmaqLyo9QqFJu-txp8X9788lvXYA_SmLVXbyRg2TBZP0iGHcCZYngRW6-CiuzEthGRQfn7isqzllJ9HsiPuo_vPbI31X7gQiP4VNHCuvXpbL6pxTDiIqXnGjuFEoIux-YgVCIjH6c4JHp2BimJ3_uFP0uDPIoLzlxxdDFWDBM2Jt5z3gS4Cba7dbl3yxy2Vc3aql3VmcPS-DApS9MYyuNCYtOo1kEYYNFCvbbRmee54wiCHPqtnmJovfjqzz_XRRwB8Mo8bJAyRXwRUlq3ADLxhAMyEYZn9b6ftd-sJ-AnmWDYfSUr__-RCYvrzCK722iRTQOyWBji111EafFYr6DfKeb7WPm-jGux4Um9OveVttlByTsahsTRMhC7yP38JoaBqhiirSr2gDsl7lOkRx9j6eXaPooa_LEmK_JCagdzN0v_0ZGCxhLfmU1zVj8Qt5Fp75P-c3OEtWRtVuzIHJ6tUBEzhdFUHP5rTrUhtun-SEy0oUIWhX7Hny9F6T8UJ6XYRYIxUeVw2g7sNib0wipHYivr5kLAckkpkru6zTBP5s_GuAJVocYGglBDs7ZufzffLJdN7fkqm2e0Agl6xAUr_V6gj2EUQGPxYh__s7JnjsCYnhHxf3CagBA21Zg2HwGN48UEneZOu9Jl5bo9CwWeFipORcAVRJEC3M9dSdkIkuCa8TZyjIHFRtiF4wqu6rR53EF9ro37cCv2uC3Ewt8AKilHekXvYnNKreRHu4CI3NZE3DF6kGVuuabPRIk1rwJ-xT_9XSN-nB3Ih_u2QDhqYKeOHmfXGr8RUs6D9iFo5QwHdNauuic64BwqnY5rceza-ndOOUx8CYYALY3wC20kAIuy-8KK4YDATG3K2T31ao4IRF3LTWX8B10x03SXolefd2n25lPCrNR6TAlenZL-xljyzcw1D7PzXmVE3vz8BMdMgBX3A7gqtik60E5Jb4_eUFp8HsqVEOm1z37tWj00T5WrjrxDFKZXPZeh5cX0EnynsiDdZzotTTSelPvCEtkxgH4to9yrWMSrPglS4h-gClzTpEoqMVHPNy_ERtiYll9Mxy2SCx0fV2dSSi1R9djUXlKU0YsWy7j_Lprd0Fp2lPBhbQcAB2V5QczT1jCqLmnbW-BnhaqAZgRjgoh9DPxsebV5Lhs92MyK7BGODzdFvVIQcrx8ntkgsXwyz1RXm_oSqm8bAIjHdee9lEkrmyCWKqvSJwW7ui5HcqaBcXdcOVWddPBypBrgJ0fZDYaZVyfk1yg95OdT00jZPsbDbzVcD46LaJbI-N8sn8pDibiK_PMAPlESQftlFt9RDd8TZ5STDrpnXmvcR1MZkh57LhqtE_KpWjUGZMhNJI5oFmGn8QkX_iHAANbKlLRQFne2n4KF_ubPlr_4GE20jQX-JkK3LSXv06eLpQLZnt78AVknL-qtFiU_ummX5vF2DDlwrARMVmrmQiOGN-CAIV11yrX92R-G7bWep69Dub-0p8g6TSQEQmFd2kivlZYOo48aFYuQBZsU8wpvs-MwVNN6YYqge64916A2AK72HiASNLeFC9ChZHbM6xz9-v5dX9SE0XZ6vruLVitKqJJn6z7jjF-2Hgpy5bkedtwV1MyyI5g2h1q7pCxZZ0LKLFoSDcMyEPH9PTreo12meUWX0qck3vYCqf4FlsQM7QqRTYR_xHNb9W9SW3r9u8HnQSfj_pOnmOVEm8nJeAGS-hl0epgQTu5KBlvJRI4_Y0xozFo-iqmFYubqNRiUB04l1T9"
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "id": "msg_abc",
+      "phase": "commentary",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "I will add the file.",
+          "annotations": []
+        }
+      ]
+    },
+    {
+      "type": "custom_tool_call",
+      "id": "ctc_1",
+      "status": "completed",
+      "call_id": "call_patch",
+      "name": "apply_patch",
+      "input": "*** Begin Patch\n*** Add File: hello.txt\n+hi there\n*** End Patch\n"
+    },
+    {
+      "type": "custom_tool_call_output",
+      "call_id": "call_patch",
+      "output": "Success. Updated the following files:\nA hello.txt\n"
+    },
+    {
+      "type": "function_call",
+      "call_id": "call_w",
+      "name": "get_weather",
+      "namespace": "mcp__weather",
+      "arguments": "{\"city\": \"Paris\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_w",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "sunny"
+        },
+        {
+          "type": "input_image",
+          "image_url": "https://example.com/sky.png"
+        }
+      ]
+    },
+    {
+      "type": "tool_search_call",
+      "id": "tsc_1",
+      "call_id": "ts_1",
+      "status": "completed",
+      "arguments": {
+        "query": "calendar"
+      },
+      "execution": "client"
+    },
+    {
+      "type": "tool_search_output",
+      "call_id": "ts_1",
+      "status": "completed",
+      "tools": [
+        {
+          "type": "function",
+          "name": "cal_list",
+          "parameters": {
+            "type": "object"
+          }
+        }
+      ],
+      "execution": "client"
+    },
+    {
+      "type": "local_shell_call",
+      "id": "lsh_1",
+      "call_id": "sh_1",
+      "status": "completed",
+      "action": {
+        "type": "exec",
+        "command": [
+          "ls"
+        ]
+      }
+    },
+    {
+      "type": "reasoning",
+      "id": "rs_only",
+      "summary": [],
+      "encrypted_content": "prs1.sealed-blob"
+    },
+    {
+      "type": "compaction",
+      "encrypted_content": "gAAAAcompacted=="
+    },
+    {
+      "type": "message",
+      "role": "developer",
+      "content": "Collaboration mode changed."
+    },
+    {
+      "type": "additional_tools",
+      "tools": [
+        {
+          "type": "function",
+          "name": "late_tool"
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "thanks"
+        }
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "name": "get_weather",
+      "description": "Get current weather",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "city"
+        ]
+      }
+    },
+    {
+      "type": "custom",
+      "name": "apply_patch",
+      "description": "Use the apply_patch tool to edit files.",
+      "format": {
+        "type": "grammar",
+        "syntax": "lark",
+        "definition": "start: begin_patch hunk+ end_patch\nbegin_patch: \"*** Begin Patch\" LF\nend_patch: \"*** End Patch\" LF?\n\nhunk: add_hunk | delete_hunk | update_hunk\nadd_hunk: \"*** Add File: \" filename LF add_line+\ndelete_hunk: \"*** Delete File: \" filename LF\nupdate_hunk: \"*** Update File: \" filename LF change_move? change?\n\nfilename: /(.+)/\nadd_line: \"+\" /(.*)/ LF -> line\n\nchange_move: \"*** Move to: \" filename LF\nchange: (change_context | change_line)+ eof_line?\nchange_context: (\"@@\" | \"@@ \" /(.+)/) LF\nchange_line: (\"+\" | \"-\" | \" \") /(.*)/ LF\neof_line: \"*** End of File\" LF\n\n%import common.LF\n"
+      }
+    },
+    {
+      "type": "namespace",
+      "name": "mcp__weather",
+      "description": "Weather tools",
+      "tools": [
+        {
+          "type": "function",
+          "name": "get_weather",
+          "parameters": {
+            "type": "object"
+          }
+        }
+      ]
+    },
+    {
+      "type": "web_search",
+      "external_web_access": false
+    },
+    {
+      "type": "tool_search",
+      "execution": "client",
+      "description": "Search tools",
+      "parameters": {
+        "type": "object"
+      }
+    }
+  ],
+  "tool_choice": "auto",
+  "parallel_tool_calls": true,
+  "reasoning": {
+    "effort": "high",
+    "summary": "auto"
+  },
+  "store": false,
+  "stream": true,
+  "include": [
+    "reasoning.encrypted_content"
+  ],
+  "prompt_cache_key": "019a-thread",
+  "service_tier": "priority",
+  "text": {
+    "verbosity": "low",
+    "format": {
+      "type": "text"
+    }
+  },
+  "client_metadata": {
+    "x": "y"
+  }
+}

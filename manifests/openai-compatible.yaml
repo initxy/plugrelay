@@ -1,0 +1,51 @@
+# Generic: not one vendor's API. Endpoints follow OpenAI's shapes, checked
+# 2026-11 against https://developers.openai.com/api/reference/overview; what
+# a given server actually serves varies, hence the 404 fallthrough below.
+id: openai-compatible
+kind: provider
+name: Generic OpenAI-compatible service
+name_zh: "通用 OpenAI 兼容服务"
+category: custom
+homepage: https://platform.openai.com/docs/api-reference
+interpreter: openai-compatible
+# Each upstream instance is its own issuer group unless the upstream config
+# sets `issuer`; reasoning state is never shared across instances by default.
+variables:
+  base_url:
+    default: http://127.0.0.1:8000/v1
+    description: Base URL including /v1, e.g. https://llm.example.com/v1.
+    description_zh: "服务地址，带 /v1，例如 https://llm.example.com/v1。"
+auth:
+  key_optional: true
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: keyed
+endpoints:
+  - id: responses
+    protocol: openai-responses
+    base_url: "{base_url}"
+  - id: chat
+    protocol: openai-chat
+    capabilities:
+      freeform_tools: false
+    base_url: "{base_url}"
+  # A server without /completions answers 404 and the next candidate is tried.
+  - id: completions
+    protocol: openai-completions
+    base_url: "{base_url}"
+  # Media operations; a server without one answers 404 the same way.
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: "{base_url}"
+  - id: images
+    protocol: openai-images
+    base_url: "{base_url}"
+  - id: audio
+    protocol: openai-audio
+    base_url: "{base_url}"
+  # vLLM, Jina-compatible and LiteLLM-style servers serve /rerank under /v1.
+  - protocol: rerank
+    base_url: "{base_url}"
+models:
+  list: /models

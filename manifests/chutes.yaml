@@ -1,0 +1,24 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://chutes.ai/llms.txt
+#   https://api.chutes.ai/openapi.json
+# A missing or invalid key falls back to the anonymous tier and answers 429.
+id: chutes
+kind: provider
+name: Chutes
+category: inference
+homepage: https://chutes.ai/docs
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://llm.chutes.ai/v1
+    capabilities:
+      freeform_tools: false
+models:
+  list: /models

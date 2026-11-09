@@ -1,0 +1,56 @@
+# Client compatibility run: drives real Claude Code and Codex through a relay
+# against a live upstream (scripts/compat.sh) and uploads the report. Needs
+# the repository secrets PLUGRELAY_E2E_BASE and PLUGRELAY_E2E_KEY; without
+# them the job says so and stops. See docs/compat/README.md.
+name: compat
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 * * 1" # Mondays 05:17 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  compat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PLUGRELAY_E2E_BASE: ${{ secrets.PLUGRELAY_E2E_BASE }}
+      PLUGRELAY_E2E_KEY: ${{ secrets.PLUGRELAY_E2E_KEY }}
+      PLUGRELAY_E2E_MODEL: ${{ vars.PLUGRELAY_E2E_MODEL }}
+      PLUGRELAY_E2E_CHAT_MODEL: ${{ vars.PLUGRELAY_E2E_CHAT_MODEL }}
+      PLUGRELAY_COMPAT_UPSTREAM: ${{ vars.PLUGRELAY_COMPAT_UPSTREAM }}
+    steps:
+      - name: Require the upstream secrets
+        id: gate
+        run: |
+          if [ -z "$PLUGRELAY_E2E_BASE" ] || [ -z "$PLUGRELAY_E2E_KEY" ]; then
+            echo "::notice::PLUGRELAY_E2E_BASE / PLUGRELAY_E2E_KEY secrets not set; skipping the compatibility run"
+            echo "run=false" >>"$GITHUB_OUTPUT"
+          else
+            echo "run=true" >>"$GITHUB_OUTPUT"
+          fi
+      - if: steps.gate.outputs.run == 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - if: steps.gate.outputs.run == 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - if: steps.gate.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - if: steps.gate.outputs.run == 'true'
+        name: Install the clients
+        run: npm install -g @anthropic-ai/claude-code @openai/codex
+      - if: steps.gate.outputs.run == 'true'
+        name: Run the suite
+        run: scripts/compat.sh
+      - if: always() && steps.gate.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: compat-report
+          path: docs/compat/

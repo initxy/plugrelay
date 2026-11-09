@@ -1,0 +1,81 @@
+# Checked 2026-11 against the vendor's docs (media and embeddings routes):
+#   https://learn.microsoft.com/en-us/azure/ai-foundry/openai/api-version-lifecycle
+#   https://github.com/Azure/azure-rest-api-specs/blob/main/specification/ai/data-plane/OpenAI.v1/azure-v1-v1-generated.json
+#   https://github.com/Azure/azure-rest-api-specs/blob/main/specification/ai/data-plane/OpenAI.v1/azure-v1-preview-generated.json
+#   https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/realtime-audio-websockets
+id: azure-openai
+kind: provider
+name: Azure OpenAI
+category: cloud
+homepage: https://learn.microsoft.com/azure/ai-foundry/openai/reference
+interpreter: openai
+variables:
+  resource:
+    required: true
+    description: Azure OpenAI resource name (the <resource>.openai.azure.com host).
+    description_zh: "Azure OpenAI 资源名（<resource>.openai.azure.com 里的那一段）。"
+  api_version:
+    default: "2024-10-21"
+    description: api-version for the deployment-style chat endpoint.
+    description_zh: "按部署名调用的对话接口所用的 api-version。"
+auth:
+  header: api-key
+  scheme: raw
+owned_headers: [Authorization]
+capabilities:
+  # OpenAI serves custom (freeform) tools on chat and Responses.
+  freeform_tools: true
+  cache: keyed
+endpoints:
+  # Deployment-style route: {model} is the deployment name.
+  - id: chat
+    protocol: openai-chat
+    base_url: https://{resource}.openai.azure.com
+    path: /openai/deployments/{model}/chat/completions
+    query:
+      api-version: "{api_version}"
+    issuer: azure-openai
+    capabilities:
+      max_tokens_field: max_completion_tokens
+  # Legacy text completions on an instruct deployment.
+  - id: completions
+    protocol: openai-completions
+    base_url: https://{resource}.openai.azure.com
+    path: /openai/deployments/{model}/completions
+    query:
+      api-version: "{api_version}"
+    issuer: azure-openai
+    capabilities:
+      cache: implicit
+  # v1 route: model (deployment name) travels in the body.
+  - id: responses
+    protocol: openai-responses
+    base_url: https://{resource}.openai.azure.com/openai/v1
+    issuer: azure-openai
+    capabilities:
+      # GA realtime: wss://<resource>.openai.azure.com/openai/v1/realtime?model=<deployment>,
+      # no api-version (how-to/realtime-audio-websockets).
+      realtime: true
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: https://{resource}.openai.azure.com/openai/v1
+    issuer: azure-openai
+  # Images and audio are only in the preview v1 spec, hence
+  # api-version=preview.
+  - id: images
+    protocol: openai-images
+    base_url: https://{resource}.openai.azure.com/openai/v1
+    query:
+      api-version: preview
+    issuer: azure-openai
+  - id: audio
+    protocol: openai-audio
+    base_url: https://{resource}.openai.azure.com/openai/v1
+    query:
+      api-version: preview
+    issuer: azure-openai
+errors:
+  - when: {code: insufficient_quota}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: content_filter}
+    verdict: {cause: content, signal: content_filtered}

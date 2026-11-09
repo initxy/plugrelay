@@ -1,0 +1,55 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md
+# llama-server's default port is 9931 (formerly 8080). Its own /infill
+# route does fill-in-the-middle; /v1/completions is not documented to
+# accept suffix.
+id: llama-cpp
+kind: provider
+name: llama.cpp server
+name_zh: "llama.cpp 服务端"
+category: self_hosted
+homepage: https://github.com/ggml-org/llama.cpp/tree/master/tools/server
+interpreter: openai-compatible
+variables:
+  server_url:
+    default: http://localhost:9931
+    description: Root URL of llama-server, without /v1.
+    description_zh: "llama-server 的根地址，不带 /v1。"
+# Runs without a key unless started with --api-key; an empty credential
+# secret sends no Authorization header.
+auth:
+  key_optional: true
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: "{server_url}/v1"
+    capabilities:
+      freeform_tools: false
+      reasoning: reasoning_content
+  - id: responses
+    protocol: openai-responses
+    base_url: "{server_url}/v1"
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  - id: completions
+    protocol: openai-completions
+    base_url: "{server_url}/v1"
+  - protocol: anthropic
+    base_url: "{server_url}"
+    interpreter: anthropic-compatible
+    capabilities:
+      cache: implicit
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+models:
+  list: /models

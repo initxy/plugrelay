@@ -1,0 +1,63 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.mistral.ai/api/
+#   https://docs.mistral.ai/api/endpoint/fim
+#   https://docs.mistral.ai/api/endpoint/responses
+#   https://docs.mistral.ai/inference/regional-inference
+#   https://docs.mistral.ai/openapi.yaml
+id: mistral
+kind: provider
+name: Mistral AI
+category: vendor
+homepage: https://docs.mistral.ai
+interpreter: openai-compatible
+variables:
+  host:
+    default: api.mistral.ai
+    description: API host; api.eu.mistral.ai or api.us.mistral.ai for regional inference.
+    description_zh: "API 域名；想在指定地区推理就填 api.eu.mistral.ai 或 api.us.mistral.ai。"
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    capabilities:
+      freeform_tools: false
+      # With reasoning on, message content becomes an array of thinking
+      # and text parts instead of a reasoning field; left off.
+      reasoning: false
+    base_url: https://{host}/v1
+  # Public preview and stateless: store must be false, no
+  # previous_response_id.
+  - id: responses
+    protocol: openai-responses
+    base_url: https://{host}/v1
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  # Codestral fill-in-the-middle on its own route.
+  - id: fim
+    protocol: openai-completions
+    base_url: https://{host}/v1
+    path: /fim/completions
+    capabilities:
+      fill_in_middle: true
+  # Output size is output_dimension, not dimensions.
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: https://{host}/v1
+  # Transcriptions only: /audio/speech answers base64 audio inside JSON,
+  # not audio bytes, and there are no translations.
+  - id: audio
+    protocol: openai-audio
+    base_url: https://{host}/v1
+    capabilities:
+      speech: false
+models:
+  list: /models

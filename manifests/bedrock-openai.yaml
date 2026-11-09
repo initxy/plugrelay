@@ -1,0 +1,46 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.aws.amazon.com/bedrock/latest/userguide/inference-chat-completions.html
+#   https://docs.aws.amazon.com/bedrock/latest/userguide/bedrock-mantle.html
+#   https://docs.aws.amazon.com/bedrock/latest/userguide/endpoints.html
+#   https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys.html
+# Bedrock's OpenAI-compatible route, authenticated with a Bedrock API key
+# as a bearer token (a long-term key; short-term keys expire within 12
+# hours). Keys are region-scoped. Claude through the native API is the
+# bedrock manifest. OpenAI's closed models need inference-profile ids
+# (global.openai...).
+id: bedrock-openai
+kind: provider
+name: Amazon Bedrock (OpenAI-compatible)
+name_zh: "Amazon Bedrock（OpenAI 兼容）"
+category: cloud
+homepage: https://docs.aws.amazon.com/bedrock/latest/userguide/inference-chat-completions.html
+interpreter: openai-compatible
+variables:
+  region:
+    default: us-east-1
+    description: AWS region of the API key.
+    description_zh: "API key 所属的 AWS 区域。"
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://bedrock-runtime.{region}.amazonaws.com/openai/v1
+    capabilities:
+      freeform_tools: false
+  # Synchronous only (background is refused), no server-side tools.
+  - id: responses
+    protocol: openai-responses
+    base_url: https://bedrock-runtime.{region}.amazonaws.com/openai/v1
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+errors:
+  - when: {message_contains: "isn't supported on this route"}
+    verdict: {cause: request, retry: next, signal: not_found}

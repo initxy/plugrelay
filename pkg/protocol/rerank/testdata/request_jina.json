@@ -1,0 +1,1 @@
+{"model":"jina-reranker-v2-base-multilingual","query":"capital of France","documents":["Berlin is in Germany.",{"text":"Paris is the capital of France.","id":"doc-7"},"France borders Spain."],"top_n":2,"return_documents":true,"truncation":true}

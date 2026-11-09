@@ -1,0 +1,52 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.cloud.google.com/vertex-ai/generative-ai/docs/partner-models/claude/use-claude
+#   https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/google-managed
+# Token counting (count-tokens:rawPredict) is not on those pages.
+id: vertex-anthropic
+kind: provider
+name: Google Vertex AI (Anthropic models)
+name_zh: "Google Vertex AI（Anthropic 模型）"
+category: cloud
+homepage: https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/claude/use-claude
+# provider.vertex turns the service account key into access tokens, puts
+# the model into the path (rawPredict / streamRawPredict) and sets
+# anthropic_version in the body. Map client models to Vertex model ids
+# (claude-…@YYYYMMDD) as the upstream model name of its routes.
+interpreter: vertex
+variables:
+  project:
+    description: Google Cloud project id; defaults to project_id of the service account key.
+    description_zh: "Google Cloud 项目 ID；不填就用服务账号密钥里的 project_id。"
+  location:
+    default: global
+    description: Vertex AI location (global, us-east5, europe-west1, …).
+    description_zh: "Vertex AI 的区域（global、us-east5、europe-west1 等）。"
+# The credential is a service account key (JSON); the access token derived
+# from it goes in this header.
+auth:
+  header: Authorization
+  scheme: Bearer
+owned_headers: [X-Goog-User-Project]
+capabilities:
+  cache: explicit
+  cache_1h: false
+  server_tools: [web_search_20250305]
+endpoints:
+  - id: messages
+    protocol: anthropic
+    base_url: https://{location}-aiplatform.googleapis.com
+    # Thinking signatures from Vertex AI are not accepted by the Anthropic
+    # API or Bedrock, and the other way round.
+    issuer: vertex-anthropic
+    # First-party-only betas Vertex AI rejects.
+    unsupported_betas:
+      - claude-code-20250219
+      - oauth-2025-04-20
+      - files-api-2025-04-14
+      - mcp-client-2025-04-04
+      - code-execution-2025-05-22
+      - web-fetch-2025-09-10
+      - skills-2025-10-02
+errors:
+  - when: {status: 403, message_contains: "has been suspended"}
+    verdict: {cause: banned, signal: permission}

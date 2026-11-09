@@ -1,0 +1,5 @@
+/*
+ * Noto Sans SC as one variable font cut into ~100 unicode-range slices: a page downloads only the
+ * slices its Chinese text uses. Loaded from main.tsx, so English readers don't block on these rules.
+ */
+@import "@fontsource-variable/noto-sans-sc/wght.css";

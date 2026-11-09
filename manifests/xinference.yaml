@@ -1,0 +1,40 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://inference.readthedocs.io/en/latest/getting_started/using_xinference.html
+# The model field is the launched model's UID.
+id: xinference
+kind: provider
+name: Xorbits Inference (Xinference)
+category: self_hosted
+homepage: https://inference.readthedocs.io
+interpreter: openai-compatible
+variables:
+  server_url:
+    default: http://localhost:9997
+    description: Root URL of the Xinference server, without /v1.
+    description_zh: "Xinference 服务的根地址，不带 /v1。"
+# Self-hosted servers often run without a key; an empty credential secret
+# sends no Authorization header.
+auth:
+  key_optional: true
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: "{server_url}/v1"
+    capabilities:
+      freeform_tools: false
+  - id: completions
+    protocol: openai-completions
+    base_url: "{server_url}/v1"
+  - protocol: anthropic
+    base_url: "{server_url}/anthropic"
+    interpreter: anthropic-compatible
+    capabilities:
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+models:
+  list: /models

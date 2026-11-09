@@ -1,0 +1,67 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://www.alibabacloud.com/help/en/model-studio/compatibility-of-openai-with-dashscope
+#   https://www.alibabacloud.com/help/en/model-studio/anthropic-api-messages
+#   https://www.alibabacloud.com/help/en/model-studio/compatibility-with-openai-responses-api
+#   https://www.alibabacloud.com/help/en/model-studio/embedding
+#   https://www.alibabacloud.com/help/en/model-studio/error-code
+# The international edition of Model Studio: its own console and keys,
+# bound to a region. The docs lead with per-workspace hosts
+# ({WorkspaceId}.{region}.maas.aliyuncs.com, region ap-southeast-1,
+# us-east-1, eu-central-1, ap-northeast-1 or cn-hongkong); the Singapore
+# dashscope host below works as well. The China edition is qwen-dashscope.
+id: qwen-dashscope-intl
+kind: provider
+name: Alibaba Cloud Model Studio (international)
+name_zh: "阿里云百炼（国际版）"
+category: cloud
+homepage: https://www.alibabacloud.com/help/en/model-studio/
+interpreter: openai-compatible
+variables:
+  host:
+    default: dashscope-intl.aliyuncs.com
+    description: API host; a workspace host such as <WorkspaceId>.us-east-1.maas.aliyuncs.com.
+    description_zh: "API 域名；工作空间域名，例如 <WorkspaceId>.us-east-1.maas.aliyuncs.com。"
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://{host}/compatible-mode/v1
+    capabilities:
+      freeform_tools: false
+      reasoning: reasoning_content
+  - id: responses
+    protocol: openai-responses
+    base_url: https://{host}/compatible-mode/v1
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  # Explicit cache_control breakpoints are honoured (5-minute TTL).
+  - protocol: anthropic
+    base_url: https://{host}/apps/anthropic
+    interpreter: anthropic-compatible
+    capabilities:
+      cache: explicit
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: https://{host}/compatible-mode/v1
+errors:
+  # Overdue accounts answer 403, which would otherwise quarantine the key.
+  - when: {code: Arrearage}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: AllocationQuota.FreeTierOnly}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, model_scope: true, signal: quota_exhausted}
+  - when: {code: DataInspectionFailed}
+    verdict: {cause: content, signal: content_filtered}
+models:
+  list: /models

@@ -1,0 +1,71 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.bigmodel.cn/cn/coding-plan/quick-start
+#   https://docs.bigmodel.cn/cn/coding-plan/tool/others
+#   https://docs.bigmodel.cn/cn/faq/api-code
+#   https://docs.z.ai/devpack/tool/others
+# The GLM Coding Plan: plan keys are separate from ordinary API keys, and
+# the plan quota applies only on these routes.
+id: zhipu-glm-coding
+kind: provider
+name: Zhipu GLM Coding Plan
+name_zh: "智谱 GLM Coding Plan"
+category: vendor
+homepage: https://docs.bigmodel.cn/cn/coding-plan/quick-start
+variables:
+  host:
+    default: open.bigmodel.cn
+    description: API host; api.z.ai for the international plan.
+    description_zh: "API 域名；国际版套餐填 api.z.ai。"
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://{host}/api/coding/paas/v4
+    interpreter: openai-compatible
+    capabilities:
+      freeform_tools: false
+      max_tokens_field: max_tokens
+      reasoning: reasoning_content
+  - protocol: anthropic
+    base_url: https://{host}/api/anthropic
+    interpreter: anthropic-compatible
+    capabilities:
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+errors:
+  # Business codes in error.code, all on HTTP 429.
+  - when: {code: "1113"}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  # 5-hour, weekly and monthly windows (the message names the reset time),
+  # also when no balance or spend cap is left for overage.
+  - when: {code: "1308"}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: "1310"}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: "1316"}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: "1317"}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: "1318"}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: "1319"}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: "1320"}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: "1321"}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  # Personal or enterprise plan expired: an operator must renew it.
+  - when: {code: "1309"}
+    verdict: {cause: quota, credential: manual, retry: next, signal: quota_exhausted}
+  - when: {code: "1314"}
+    verdict: {cause: quota, credential: manual, retry: next, signal: quota_exhausted}
+  # Model outside the plan; another upstream may serve it.
+  - when: {code: "1311"}
+    verdict: {cause: request, retry: next, signal: not_found}
+  - when: {code: "1301"}
+    verdict: {cause: content, signal: content_filtered}

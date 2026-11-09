@@ -1,0 +1,58 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://www.kimi.com/code/docs/en/kimi-code/models.html
+#   https://www.kimi.com/code/docs/en/kimi-code/error-reference
+#   https://www.kimi.com/code/docs/en/third-party-tools/claude-code
+# The Kimi Code membership plan: its keys are separate from the Kimi open
+# platform's (manifest moonshot-kimi) and meant for coding tools; the docs
+# warn that an altered User-Agent can suspend the benefits.
+id: kimi-code
+kind: provider
+name: Kimi Code (coding plan)
+name_zh: "Kimi Code（编程套餐）"
+category: vendor
+homepage: https://www.kimi.com/code/docs/
+variables:
+  host:
+    default: api.kimi.com
+    description: API host; api.kimi.ai outside mainland China.
+    description_zh: "API 域名；中国大陆以外填 api.kimi.ai。"
+auth:
+  header: Authorization
+  scheme: Bearer
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://{host}/coding/v1
+    interpreter: openai-compatible
+    capabilities:
+      freeform_tools: false
+      reasoning: reasoning_content
+  - id: responses
+    protocol: openai-responses
+    base_url: https://{host}/coding/v1
+    interpreter: openai-compatible
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  - protocol: anthropic
+    base_url: https://{host}/coding
+    interpreter: anthropic-compatible
+    auth:
+      header: x-api-key
+      scheme: raw
+    capabilities:
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+errors:
+  # 5-hour, weekly and monthly plan windows, and extra-usage balance, all
+  # arrive as 429; they clear only at the window's reset.
+  - when: {status: 429, message_contains: "usage limit"}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {status: 429, message_contains: "balance is insufficient"}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {status: 429, message_contains: "balance has run out"}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}

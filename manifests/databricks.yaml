@@ -1,0 +1,55 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.databricks.com/aws/en/ai-gateway/query-model-services
+#   https://docs.databricks.com/aws/en/machine-learning/model-serving/query-chat-models
+#   https://docs.databricks.com/aws/en/machine-learning/model-serving/query-anthropic-messages
+#   https://docs.databricks.com/aws/en/machine-learning/foundation-model-apis/api-reference
+# The credential is a personal access token (dapi...). Model names are
+# Unity Catalog names such as system.ai.claude-sonnet-4-5.
+id: databricks
+kind: provider
+name: Databricks (AI Gateway, Foundation Model APIs)
+name_zh: "Databricks（AI 网关 / 基础模型 API）"
+category: cloud
+homepage: https://docs.databricks.com/aws/en/ai-gateway/
+interpreter: openai-compatible
+variables:
+  workspace:
+    required: true
+    description: Workspace host, e.g. dbc-1234.cloud.databricks.com or adb-1234.azuredatabricks.net.
+    description_zh: "工作区域名，例如 dbc-1234.cloud.databricks.com 或 adb-1234.azuredatabricks.net。"
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+  max_tokens_field: max_tokens
+endpoints:
+  # Reasoning comes back as content items of type "reasoning", not a
+  # reasoning field; left off.
+  - id: chat
+    protocol: openai-chat
+    base_url: https://{workspace}/ai-gateway/mlflow/v1
+    capabilities:
+      freeform_tools: false
+      reasoning: false
+  - id: responses
+    protocol: openai-responses
+    base_url: https://{workspace}/ai-gateway/mlflow/v1
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: https://{workspace}/ai-gateway/mlflow/v1
+  # Claude models only; the token goes in Authorization.
+  - protocol: anthropic
+    base_url: https://{workspace}/ai-gateway/anthropic
+    interpreter: anthropic-compatible
+    capabilities:
+      cache: explicit
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false

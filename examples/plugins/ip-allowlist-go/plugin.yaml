@@ -1,0 +1,24 @@
+id: ip-allowlist
+name: IP allowlist
+version: 0.1.0
+description: Rejects requests whose client address is outside the allowed CIDR ranges.
+kind: middleware
+points: [middleware.onRequest]
+
+command: ./ip-allowlist      # go build -o ip-allowlist .
+
+timeouts:
+  call: 500ms
+max_concurrency: 32
+fail_policy: closed
+
+settings:
+  - key: allow
+    type: list
+    default: []
+    scopes: [global, group, key]
+    merge: override
+    description: CIDR ranges allowed to call the relay, e.g. 10.0.0.0/8. Empty allows every address.
+
+permissions:
+  network: none

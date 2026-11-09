@@ -1,0 +1,8 @@
+model_provider = "plugrelay"
+model = "gpt-5.5"
+
+[model_providers.plugrelay]
+name = "plugrelay"
+base_url = "http://127.0.0.1:8787/v1"
+env_key = "PLUGRELAY_API_KEY"
+wire_api = "responses"

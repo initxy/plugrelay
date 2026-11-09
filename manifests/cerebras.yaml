@@ -1,0 +1,28 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://inference-docs.cerebras.ai/resources/openai
+#   https://inference-docs.cerebras.ai/api-reference/chat-completions
+#   https://inference-docs.cerebras.ai/support/error
+id: cerebras
+kind: provider
+name: Cerebras Inference
+name_zh: "Cerebras 推理"
+category: inference
+homepage: https://inference-docs.cerebras.ai
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api.cerebras.ai/v1
+    capabilities:
+      freeform_tools: false
+  # No suffix parameter.
+  - id: completions
+    protocol: openai-completions
+    base_url: https://api.cerebras.ai/v1
+models:
+  list: /models

@@ -1,0 +1,23 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://www.modelscope.cn/docs/model-service/API-Inference/intro
+# A free service with a daily request quota per account.
+id: modelscope
+kind: provider
+name: ModelScope API-Inference
+name_zh: "魔搭 ModelScope"
+category: inference
+homepage: https://www.modelscope.cn/docs/model-service/API-Inference/intro
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api-inference.modelscope.cn/v1
+    capabilities:
+      freeform_tools: false
+models:
+  list: /models

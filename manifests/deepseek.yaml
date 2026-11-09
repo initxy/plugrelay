@@ -1,0 +1,65 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://api-docs.deepseek.com/guides/anthropic_api
+#   https://api-docs.deepseek.com/guides/fim_completion
+#   https://api-docs.deepseek.com/quick_start/error_codes
+id: deepseek
+kind: provider
+name: DeepSeek
+category: vendor
+homepage: https://api-docs.deepseek.com
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+  max_tokens_field: max_tokens
+  unsupported_params: [service_tier]
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api.deepseek.com
+    interpreter: openai-compatible
+    capabilities:
+      freeform_tools: false
+      # Reasoning text arrives in reasoning_content and is sent back on
+      # tool turns.
+      reasoning: reasoning_content
+  - protocol: anthropic
+    base_url: https://api.deepseek.com/anthropic
+    interpreter: anthropic-compatible
+    unsupported_betas: [context-1m-2025-08-07]
+    # cache_control is ignored (the prefix cache is automatic); document
+    # blocks and server tools are not supported.
+    capabilities:
+      cache: implicit
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+      documents: false
+  # FIM completion lives on the beta base URL.
+  - id: completions
+    protocol: openai-completions
+    base_url: https://api.deepseek.com/beta
+    interpreter: openai-compatible
+    capabilities:
+      fill_in_middle: true
+errors:
+  - when: {status: 402}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {status: 400, message_contains: "maximum context length"}
+    verdict: {cause: request, signal: context_too_long}
+models:
+  list: /models
+# List prices, USD per million tokens, from
+# https://api-docs.deepseek.com/quick_start/pricing as read on 2026-11-05.
+# DeepSeek bills half these rates off-peak (peak: 01:00-04:00 and
+# 06:00-10:00 UTC on weekdays); the relay has no time-of-day pricing, so
+# these are the peak rates. DeepSeek also accepts deepseek-v4-flash for
+# deepseek-flash and bills it the same; deepseek-chat and deepseek-reasoner
+# are not on the page.
+pricing:
+  currency: USD
+  models:
+    deepseek-flash:    {input: 0.3, cache_read: 0.006, output: 1.2}
+    deepseek-v4-flash: {input: 0.3, cache_read: 0.006, output: 1.2}
+    deepseek-v4-pro:   {input: 1.32, cache_read: 0.044, output: 3.96}

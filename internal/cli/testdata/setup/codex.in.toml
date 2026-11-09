@@ -1,0 +1,17 @@
+# Codex settings
+model = "o3"
+approval_policy = "on-request"
+model_reasoning_effort = "high"
+
+[model_providers.plugrelay]
+name = "old"
+base_url = "https://old.example.com/v1"
+# stale comment inside the old table
+env_key = "OLD"
+
+[model_providers.ollama]
+name = "Ollama"
+base_url = "http://localhost:11434/v1"
+
+[profiles.fast]
+model = "gpt-5.5-mini"

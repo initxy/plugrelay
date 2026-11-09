@@ -1,0 +1,68 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://openrouter.ai/docs/api/reference/overview
+#   https://openrouter.ai/docs/api/reference/errors-and-debugging
+#   https://openrouter.ai/docs/api/api-reference/anthropic-messages/create-a-message
+#   https://openrouter.ai/openapi.json
+id: openrouter
+kind: provider
+name: OpenRouter
+category: gateway
+homepage: https://openrouter.ai/docs
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    capabilities:
+      freeform_tools: false
+    base_url: https://openrouter.ai/api/v1
+  - id: responses
+    protocol: openai-responses
+    base_url: https://openrouter.ai/api/v1
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  - id: completions
+    protocol: openai-completions
+    base_url: https://openrouter.ai/api/v1
+  # OpenRouter only guarantees this route with the Anthropic first-party
+  # provider behind it.
+  - protocol: anthropic
+    base_url: https://openrouter.ai/api
+    interpreter: anthropic-compatible
+    capabilities:
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: https://openrouter.ai/api/v1
+  # Transcriptions and speech; /audio/translations answers 404. Images use
+  # OpenRouter's own /images route, not OpenAI's.
+  - id: audio
+    protocol: openai-audio
+    base_url: https://openrouter.ai/api/v1
+  # /rerank in openapi.json; no return_documents, documents always come
+  # back; usage carries total_tokens and search_units.
+  - protocol: rerank
+    base_url: https://openrouter.ai/api/v1
+errors:
+  - when: {status: 402}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+models:
+  list: /models
+# The key's own spending limit (USD), not the account's credits: a key
+# without a limit reports null and stays "unknown". limit_reset is daily,
+# weekly or monthly at 00:00 UTC (weeks start Monday), or null.
+# https://openrouter.ai/docs/api/api-reference/api-keys/get-current-api-key
+quota:
+  endpoint: chat
+  path: /key
+  remaining: data.limit_remaining
+  limit: data.limit
+  reset_period: data.limit_reset

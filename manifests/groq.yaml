@@ -1,0 +1,45 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://console.groq.com/docs/openai
+#   https://console.groq.com/docs/errors
+#   https://console.groq.com/docs/prompt-caching
+#   https://console.groq.com/docs/api-reference
+# Prompt caching covers only the gpt-oss models, so none is declared.
+id: groq
+kind: provider
+name: Groq
+category: inference
+homepage: https://console.groq.com/docs
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+  unsupported_params: [logprobs, logit_bias, top_logprobs]
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    capabilities:
+      freeform_tools: false
+    base_url: https://api.groq.com/openai/v1
+  # Beta.
+  - id: responses
+    protocol: openai-responses
+    base_url: https://api.groq.com/openai/v1
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  # /audio/transcriptions, /audio/translations and /audio/speech; no
+  # embeddings.
+  - id: audio
+    protocol: openai-audio
+    base_url: https://api.groq.com/openai/v1
+errors:
+  # Flex tier out of capacity: another credential or upstream may have room.
+  - when: {status: 498}
+    verdict: {cause: rate_limit, retry: next, credential: cooldown, cooldown: 10s, model_scope: true, signal: overloaded}
+models:
+  list: /models

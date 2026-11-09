@@ -1,0 +1,60 @@
+{
+  "model": "claude-opus-4-6",
+  "max_tokens": 32000,
+  "stream": true,
+  "system": [
+    {"type": "text", "text": "x-anthropic-billing-header: cc_version=2.1.318.a1b; cc_entrypoint=cli; cch=00000;"},
+    {"type": "text", "text": "You are an interactive CLI agent that helps users with software engineering tasks.", "cache_control": {"type": "ephemeral", "ttl": "1h"}},
+    {"type": "text", "text": "Use the tools available to you. Answer <concisely> & precisely.", "cache_control": {"type": "ephemeral"}}
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {"type": "text", "text": "<system-reminder>\nAs you answer the user's questions, you can use the following context:\n# currentDate\nToday's date is 2026-11-05.\n</system-reminder>\n"},
+        {"type": "text", "text": "Find the failing test in pkg/ir and fix it."}
+      ]
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {"type": "thinking", "thinking": "The user wants me to look at pkg/ir. Let me list the files first.", "signature": "EqQBCkYIBRgCKkB2c2lnbmF0dXJlLWJ5dGVz"},
+        {"type": "redacted_thinking", "data": "EmwKAhgBEgy3va3pzix/LafPsn4aDFIT2Xlxh0L5L8rLVyIwxtE3rAFBa8cr3qpPkNRj2YfWXGmKDPH4ab9"},
+        {"type": "text", "text": "I'll list the package first."},
+        {"type": "tool_use", "id": "toolu_01A", "name": "Bash", "input": {"command": "ls pkg/ir", "description": "List IR files"}}
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {"type": "tool_result", "tool_use_id": "toolu_01A", "content": "block.go\nrequest.go\nresponse.go"},
+        {"type": "tool_result", "tool_use_id": "toolu_01B", "is_error": true, "content": [
+          {"type": "text", "text": "screenshot attached"},
+          {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "iVBORw0KGgo="}}
+        ]},
+        {"type": "text", "text": "Also check this doc.", "cache_control": {"type": "ephemeral"}},
+        {"type": "document", "title": "spec", "source": {"type": "text", "media_type": "text/plain", "data": "spec body"}, "citations": {"enabled": true}}
+      ]
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {"type": "server_tool_use", "id": "srvtoolu_01", "name": "web_search", "input": {"query": "go 1.26 release notes"}},
+        {"type": "web_search_tool_result", "tool_use_id": "srvtoolu_01", "content": [{"type": "web_search_result", "url": "https://go.dev/doc/go1.26", "title": "Go 1.26", "encrypted_content": "Eo8B", "page_age": null}]},
+        {"type": "text", "text": "Go 1.26 notes say", "citations": [{"type": "web_search_result_location", "url": "https://go.dev/doc/go1.26", "title": "Go 1.26", "encrypted_index": "Eo8C", "cited_text": "..."}]}
+      ]
+    },
+    {"role": "user", "content": "thanks, continue"}
+  ],
+  "tools": [
+    {"name": "Bash", "description": "Run a shell command.", "input_schema": {"type": "object", "properties": {"command": {"type": "string"}, "description": {"type": "string"}}, "required": ["command"], "additionalProperties": false, "$schema": "http://json-schema.org/draft-07/schema#"}},
+    {"name": "mcp__docs__search", "description": "Search docs.", "input_schema": {"type": "object", "properties": {"q": {"type": "string"}}}, "defer_loading": true},
+    {"type": "web_search_20250305", "name": "web_search", "max_uses": 8, "allowed_domains": ["go.dev"], "cache_control": {"type": "ephemeral", "ttl": "1h"}}
+  ],
+  "tool_choice": {"type": "auto", "disable_parallel_tool_use": false},
+  "thinking": {"type": "enabled", "budget_tokens": 31999},
+  "output_config": {"effort": "high"},
+  "temperature": 1,
+  "metadata": {"user_id": "{\"device_id\":\"d1\",\"account_uuid\":\"a1\",\"session_id\":\"8b0c2a6e-5d3f-4c1a-9e7b-2f4d6a8c0e12\"}"},
+  "context_management": {"edits": [{"type": "clear_thinking_20251015", "keep": "all"}]}
+}

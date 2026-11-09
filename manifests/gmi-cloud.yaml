@@ -1,0 +1,28 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.gmicloud.ai/inference-engine/api-reference/llm-api-reference
+#   https://docs.gmicloud.ai/inference-engine/api-reference/rate-limit
+id: gmi-cloud
+kind: provider
+name: GMI Cloud
+category: inference
+homepage: https://docs.gmicloud.ai
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+# Selects the organization: only the credential's value (meta key
+# "organization") goes out.
+owned_headers: [X-Organization-ID]
+credential_headers:
+  X-Organization-ID: organization
+capabilities:
+  cache: none
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api.gmi-serving.com/v1
+    capabilities:
+      freeform_tools: false
+models:
+  list: /models

@@ -1,0 +1,27 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://developers.cloudflare.com/workers-ai/configuration/open-ai-compatibility/
+#   https://developers.cloudflare.com/workers-ai/features/prompt-caching/
+# The Responses route serves only the gpt-oss models without streaming, so
+# it is left out. Models are listed only by the native search API.
+id: cloudflare-workers-ai
+kind: provider
+name: Cloudflare Workers AI
+category: cloud
+homepage: https://developers.cloudflare.com/workers-ai/
+interpreter: openai-compatible
+variables:
+  account_id:
+    required: true
+    description: Cloudflare account ID.
+    description_zh: "Cloudflare 账号 ID。"
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1
+    capabilities:
+      freeform_tools: false

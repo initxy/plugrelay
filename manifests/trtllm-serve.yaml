@@ -1,0 +1,54 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/commands/trtllm-serve/trtllm-serve.rst
+#   https://github.com/NVIDIA/TensorRT-LLM/blob/main/tensorrt_llm/serve/openai_server.py
+# Embeddings and images run as separate server modes (trtllm-serve
+# embeddings, the visual-gen server) and are not declared here. The
+# Anthropic route is not available on the gpt-oss harmony path.
+id: trtllm-serve
+kind: provider
+name: TensorRT-LLM (trtllm-serve)
+category: self_hosted
+homepage: https://nvidia.github.io/TensorRT-LLM/
+interpreter: openai-compatible
+variables:
+  server_url:
+    default: http://localhost:8000
+    description: Root URL of the server, without /v1.
+    description_zh: "服务的根地址，不带 /v1。"
+# Inference routes take no key; leave the credential secret empty.
+auth:
+  key_optional: true
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+  max_tokens_field: max_completion_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: "{server_url}/v1"
+    capabilities:
+      freeform_tools: false
+      reasoning: reasoning_content
+  - id: responses
+    protocol: openai-responses
+    base_url: "{server_url}/v1"
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  - id: completions
+    protocol: openai-completions
+    base_url: "{server_url}/v1"
+  - protocol: anthropic
+    base_url: "{server_url}"
+    interpreter: anthropic-compatible
+    capabilities:
+      cache: implicit
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+models:
+  list: /models

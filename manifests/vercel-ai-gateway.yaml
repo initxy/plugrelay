@@ -1,0 +1,43 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://vercel.com/docs/ai-gateway/sdks-and-apis
+#   https://vercel.com/docs/ai-gateway/sdks-and-apis/openai-chat-completions
+#   https://vercel.com/docs/ai-gateway/models-and-providers/automatic-caching
+# Caching is passed through unchanged unless the gateway's automatic
+# caching option is set, so it is whatever the routed provider does.
+id: vercel-ai-gateway
+kind: provider
+name: Vercel AI Gateway
+name_zh: "Vercel AI 网关"
+category: gateway
+homepage: https://vercel.com/docs/ai-gateway
+auth:
+  header: Authorization
+  scheme: Bearer
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://ai-gateway.vercel.sh/v1
+    interpreter: openai-compatible
+    capabilities:
+      cache: implicit
+      freeform_tools: false
+  - id: responses
+    protocol: openai-responses
+    base_url: https://ai-gateway.vercel.sh/v1
+    interpreter: openai-compatible
+    capabilities:
+      cache: implicit
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  - protocol: anthropic
+    base_url: https://ai-gateway.vercel.sh
+    interpreter: anthropic-compatible
+    capabilities:
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+models:
+  list: /models

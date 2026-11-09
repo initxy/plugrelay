@@ -1,0 +1,40 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://ai.gitee.com/docs/products/apis/texts/text-generation
+#   https://ai.gitee.com/docs/integrations/Development-Tools/claude_code
+id: gitee-ai
+kind: provider
+name: Gitee AI (MoArk)
+name_zh: "模力方舟（Gitee AI）"
+category: inference
+homepage: https://ai.gitee.com/docs
+variables:
+  host:
+    default: ai.gitee.com
+    description: API host; api.moark.com serves the same API.
+    description_zh: "API 域名；api.moark.com 提供同样的接口。"
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://{host}/v1
+    interpreter: openai-compatible
+    capabilities:
+      freeform_tools: false
+  - id: completions
+    protocol: openai-completions
+    base_url: https://{host}/v1
+    interpreter: openai-compatible
+  - protocol: anthropic
+    base_url: https://{host}/anthropic
+    interpreter: anthropic-compatible
+    capabilities:
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+models:
+  list: /models

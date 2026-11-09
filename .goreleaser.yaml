@@ -1,0 +1,64 @@
+version: 2
+project_name: plugrelay
+builds:
+  - main: ./cmd/plugrelay
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X github.com/initxy/plugrelay/internal/version.Version={{.Version}}
+archives:
+  - formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files: [LICENSE, README.md, examples/relay.yaml]
+checksum:
+  name_template: checksums.txt
+sboms:
+  - artifacts: archive
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sig"
+    certificate: "${artifact}.pem"
+    args: [sign-blob, --yes, "--output-signature=${signature}", "--output-certificate=${certificate}", "${artifact}"]
+    artifacts: checksum
+# One image per arch, then multi-arch :VERSION and :latest manifests over them.
+dockers:
+  - image_templates: ["ghcr.io/initxy/plugrelay:{{ .Version }}-amd64"]
+    use: buildx
+    goarch: amd64
+    dockerfile: Dockerfile.release
+    build_flag_templates: [--platform=linux/amd64]
+    extra_files: [examples/relay.yaml]
+  - image_templates: ["ghcr.io/initxy/plugrelay:{{ .Version }}-arm64"]
+    use: buildx
+    goarch: arm64
+    dockerfile: Dockerfile.release
+    build_flag_templates: [--platform=linux/arm64]
+    extra_files: [examples/relay.yaml]
+docker_manifests:
+  - name_template: "ghcr.io/initxy/plugrelay:{{ .Version }}"
+    image_templates: &arch_images
+      - "ghcr.io/initxy/plugrelay:{{ .Version }}-amd64"
+      - "ghcr.io/initxy/plugrelay:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/initxy/plugrelay:latest"
+    image_templates: *arch_images
+    # A pre-release tag must not move :latest.
+    skip_push: auto
+docker_signs:
+  - cmd: cosign
+    artifacts: manifests
+    args: [sign, --yes, "${artifact}@${digest}"]
+release:
+  github: {owner: plugrelay, name: plugrelay}
+  # The curated changelog: the annotated tag's message body (docs/releasing.md).
+  header: "{{ .TagBody }}"
+changelog:
+  use: github
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+    - title: Fixes
+      regexp: '^.*?fix(\(.+\))??!?:.+$'

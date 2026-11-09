@@ -1,0 +1,24 @@
+{
+  "id": "msg_01ABC",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-opus-4-6",
+  "content": [
+    {"type": "thinking", "thinking": "Short.", "signature": "EqQBsig"},
+    {"type": "redacted_thinking", "data": "EmwKAhgB"},
+    {"type": "text", "text": "Done."},
+    {"type": "tool_use", "id": "toolu_02", "name": "Read", "input": {"path": "a.go"}}
+  ],
+  "stop_reason": "tool_use",
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 10,
+    "cache_creation_input_tokens": 300,
+    "cache_read_input_tokens": 5000,
+    "cache_creation": {"ephemeral_5m_input_tokens": 100, "ephemeral_1h_input_tokens": 200},
+    "output_tokens": 42,
+    "service_tier": "standard",
+    "server_tool_use": {"web_search_requests": 1}
+  },
+  "container": null
+}

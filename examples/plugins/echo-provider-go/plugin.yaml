@@ -1,0 +1,20 @@
+id: echo
+name: Echo provider
+version: 0.1.0
+description: An upstream that streams back the last user message. Useful for tests and demos.
+kind: provider
+points: [provider.prepare, provider.send, provider.classify, provider.listModels]
+
+command: ./echo-provider      # go build -o echo-provider .
+transport: stdio
+
+timeouts:
+  call: 2s
+  send: 1m
+
+provider:
+  owned_headers: [Authorization]
+  issuer: echo
+
+permissions:
+  network: none

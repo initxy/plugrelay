@@ -1,0 +1,38 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://platform.minimax.cn/docs/api-reference/text-openai-api
+#   https://platform.minimax.cn/docs/api-reference/text-anthropic-api
+#   https://platform.minimax.cn/docs/api-reference/errorcode
+#   https://platform.minimax.io/docs/api-reference/text-openai-api
+# The M Plan subscription uses separate keys on the same hosts.
+id: minimax
+kind: provider
+name: MiniMax
+category: vendor
+homepage: https://platform.minimax.cn/docs
+variables:
+  host:
+    default: api.minimax.cn
+    description: API host; api.minimax.io for the international platform.
+    description_zh: "API 域名；国际站填 api.minimax.io。"
+auth:
+  header: Authorization
+  scheme: Bearer
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://{host}/v1
+    interpreter: openai-compatible
+    capabilities:
+      cache: implicit
+      freeform_tools: false
+      # Reasoning comes back in reasoning_content only when the request sets
+      # reasoning_split, otherwise inline as <think> in content; left off.
+      reasoning: false
+      unsupported_params: [presence_penalty, frequency_penalty, logit_bias]
+  - protocol: anthropic
+    base_url: https://{host}/anthropic
+    interpreter: anthropic-compatible
+    capabilities:
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false

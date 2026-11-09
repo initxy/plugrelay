@@ -1,0 +1,54 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.byteplus.com/en/docs/ModelArk/base-url-and-authentication
+#   https://docs.byteplus.com/en/docs/ModelArk/compatible-with-openai-sdk
+#   https://docs.byteplus.com/en/docs/ModelArk/chat-api
+#   https://docs.byteplus.com/en/docs/ModelArk/1541523
+#   https://docs.byteplus.com/en/docs/ModelArk/models-api
+#   https://docs.byteplus.com/en/docs/ModelArk/error-codes
+# The international edition of Volcengine Ark (Doubao, Seedream). model is
+# a model ID or an ep-... endpoint ID. There is no Anthropic route outside
+# the Coding Plan and no text /embeddings.
+id: byteplus-modelark
+kind: provider
+name: BytePlus ModelArk
+category: cloud
+homepage: https://docs.byteplus.com/en/docs/ModelArk
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://ark.ap-southeast.bytepluses.com/api/v3
+    capabilities:
+      freeform_tools: false
+      reasoning: reasoning_content
+  - id: responses
+    protocol: openai-responses
+    base_url: https://ark.ap-southeast.bytepluses.com/api/v3
+    capabilities:
+      cache: none
+      server_state: false
+      compaction: false
+      server_tools: []
+      deferred_tools: false
+  # Seedream, generations only.
+  - id: images
+    protocol: openai-images
+    base_url: https://ark.ap-southeast.bytepluses.com/api/v3
+    capabilities:
+      image_edit: false
+errors:
+  - when: {code: AccountOverdueError}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: OperationDenied.ServiceOverdue}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: SetLimitExceeded}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: QuotaExceeded}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+models:
+  list: /models

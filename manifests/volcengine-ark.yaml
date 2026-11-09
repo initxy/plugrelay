@@ -1,0 +1,80 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.volcengine.com/docs/82379/1298459
+#   https://docs.volcengine.com/docs/ark/ai-tools-other-tools?lang=zh
+#   https://docs.volcengine.com/docs/ark/responses-api-migration?lang=zh
+#   https://ark.volcengine.com/region:cn-beijing/docs/error-codes
+#   https://docs.volcengine.com/docs/82379/1302003/
+#   https://docs.volcengine.com/docs/82379/1541523/
+# The Coding Plan has its own routes: manifest volcengine-ark-coding.
+id: volcengine-ark
+kind: provider
+name: Volcengine Ark
+name_zh: "火山方舟"
+category: cloud
+homepage: https://www.volcengine.com/docs/82379
+variables:
+  region:
+    default: cn-beijing
+auth:
+  header: Authorization
+  scheme: Bearer
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://ark.{region}.volces.com/api/v3
+    interpreter: openai-compatible
+    capabilities:
+      freeform_tools: false
+      cache: none
+      reasoning: reasoning_content
+  - id: responses
+    protocol: openai-responses
+    base_url: https://ark.{region}.volces.com/api/v3
+    interpreter: openai-compatible
+    capabilities:
+      # Ark's own caching parameter is not the OpenAI one; server-side
+      # state and remote compaction are not assumed.
+      cache: none
+      server_state: false
+      compaction: false
+      server_tools: []
+      deferred_tools: false
+  - protocol: anthropic
+    base_url: https://ark.{region}.volces.com/api/compatible
+    interpreter: anthropic-compatible
+    capabilities:
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+  # Text embeddings (doubao-embedding-text-*); the multimodal route
+  # /embeddings/multimodal has its own shape.
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: https://ark.{region}.volces.com/api/v3
+    interpreter: openai-compatible
+  # Seedream, generations only; reference images go in the extra `image`
+  # field.
+  - id: images
+    protocol: openai-images
+    base_url: https://ark.{region}.volces.com/api/v3
+    interpreter: openai-compatible
+    capabilities:
+      image_edit: false
+errors:
+  # Overdue accounts answer 403, which would otherwise quarantine the key.
+  - when: {code: AccountOverdueError}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: OperationDenied.ServiceOverdue}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  # Spending limits and free-trial exhaustion arrive as 429.
+  - when: {code: AccountQuotaExceeded}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: SetLimitExceeded}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: QuotaExceeded}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: OutofContextError}
+    verdict: {cause: request, signal: context_too_long}
+  # Model not enabled for this account; another upstream may serve it.
+  - when: {code: ModelNotOpen}
+    verdict: {cause: request, retry: next, signal: not_found}

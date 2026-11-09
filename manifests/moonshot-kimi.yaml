@@ -1,0 +1,60 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://platform.kimi.com/docs/api/chat.md
+#   https://platform.kimi.com/docs/api/messages.md
+#   https://platform.kimi.com/docs/api/responses.md
+#   https://platform.kimi.com/docs/api/errors.md
+# Keys from the China and international platforms are not interchangeable.
+# The Kimi Code plan has its own manifest, kimi-code.
+id: moonshot-kimi
+kind: provider
+name: Moonshot AI (Kimi)
+name_zh: "月之暗面 Kimi"
+category: vendor
+homepage: https://platform.kimi.com/docs
+variables:
+  host:
+    default: api.moonshot.cn
+    description: API host; api.moonshot.ai for the international platform.
+    description_zh: "API 域名；国际站填 api.moonshot.ai。"
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://{host}/v1
+    interpreter: openai-compatible
+    capabilities:
+      freeform_tools: false
+      reasoning: reasoning_content
+  # K3 models only; stateless (store is always false).
+  - id: responses
+    protocol: openai-responses
+    base_url: https://{host}/v1
+    interpreter: openai-compatible
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+  - protocol: anthropic
+    base_url: https://{host}/anthropic
+    interpreter: anthropic-compatible
+    capabilities:
+      # cache_control is honoured only at the top level, not inside message
+      # content, so breakpoints are not relied on.
+      cache: implicit
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+errors:
+  # Arrears or exhausted balance arrive as 429 with this type.
+  - when: {code: exceeded_current_quota_error}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: content_filter}
+    verdict: {cause: content, signal: content_filtered}
+models:
+  list: /models

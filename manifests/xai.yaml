@@ -1,0 +1,46 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.x.ai/developers/rest-api-reference/inference/chat-completions
+#   https://docs.x.ai/developers/rest-api-reference/inference/legacy
+#   https://docs.x.ai/developers/model-capabilities/text/reasoning
+#   https://docs.x.ai/developers/rest-api-reference/inference/images.md
+# The Anthropic-compatible route is deprecated upstream and left out.
+id: xai
+kind: provider
+name: xAI
+category: vendor
+homepage: https://docs.x.ai
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+endpoints:
+  - id: responses
+    protocol: openai-responses
+    base_url: https://api.x.ai/v1
+    capabilities:
+      freeform_tools: false
+      # xAI's own search tools are not the OpenAI ones.
+      server_tools: []
+      deferred_tools: false
+  - id: chat
+    protocol: openai-chat
+    capabilities:
+      freeform_tools: false
+      reasoning: reasoning_content
+    base_url: https://api.x.ai/v1
+  # Legacy; no reasoning models, suffix unsupported.
+  - id: completions
+    protocol: openai-completions
+    base_url: https://api.x.ai/v1
+  # Generations only: /images/edits takes a JSON body, not OpenAI's
+  # multipart form. Speech and transcription use xAI's own /tts and /stt.
+  - id: images
+    protocol: openai-images
+    base_url: https://api.x.ai/v1
+    capabilities:
+      image_edit: false
+models:
+  endpoint: chat
+  list: /models

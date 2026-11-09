@@ -1,0 +1,88 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://aistudio.google.com/api-reference
+#   https://aistudio.google.com/api-reference/models
+#   https://aistudio.google.com/docs/openai
+#   https://aistudio.google.com/docs/api-errors
+id: gemini
+kind: provider
+name: Google Gemini API
+category: vendor
+homepage: https://ai.google.dev/api
+interpreter: gemini
+auth:
+  header: x-goog-api-key
+  scheme: raw
+owned_headers: [Authorization]
+capabilities:
+  cache: implicit
+endpoints:
+  - protocol: gemini
+    base_url: https://generativelanguage.googleapis.com
+    issuer: gemini
+  # OpenAI-compatible surface of the same API. Thought signatures it
+  # returns are kept apart from the native endpoint's.
+  - id: chat
+    protocol: openai-chat
+    capabilities:
+      freeform_tools: false
+    base_url: https://generativelanguage.googleapis.com/v1beta/openai
+    interpreter: openai-compatible
+    issuer: gemini-openai
+    auth:
+      header: Authorization
+      scheme: Bearer
+  # :embedContent and :batchEmbedContents
+  # (https://ai.google.dev/api/embeddings).
+  - id: embeddings
+    protocol: gemini-embeddings
+    base_url: https://generativelanguage.googleapis.com
+    issuer: gemini
+  # /embeddings of the OpenAI-compatible surface
+  # (https://ai.google.dev/gemini-api/docs/openai#embeddings).
+  - protocol: openai-embeddings
+    base_url: https://generativelanguage.googleapis.com/v1beta/openai
+    interpreter: openai-compatible
+    issuer: gemini-openai
+    auth:
+      header: Authorization
+      scheme: Bearer
+  # /images/generations of the OpenAI-compatible surface; edits are not
+  # documented (https://aistudio.google.com/docs/openai, checked 2026-11).
+  - id: images
+    protocol: openai-images
+    base_url: https://generativelanguage.googleapis.com/v1beta/openai
+    interpreter: openai-compatible
+    issuer: gemini-openai
+    auth:
+      header: Authorization
+      scheme: Bearer
+    capabilities:
+      image_edit: false
+errors:
+  # Google APIs report a suspended key or project as "Consumer '...' has
+  # been suspended", which the built-in ban wording (account, organization,
+  # project, ...) does not cover.
+  - when: {status: 403, message_contains: "has been suspended"}
+    verdict: {cause: banned, signal: permission}
+models:
+  list: /v1beta/models
+# Paid-tier standard list prices for text, USD per million tokens, from
+# https://aistudio.google.com/docs/pricing (formerly
+# ai.google.dev/gemini-api/docs/pricing) as read on 2026-11-05. Pro models
+# are priced at the <= 200K-token prompt tier; longer prompts cost more.
+# Context-cache storage (per hour) is not a token price and is left out.
+# Announced increases not yet applied: gemini-4-argon doubles on
+# 2026-12-01, gemini-3.8-flash and gemini-3.6-flash on 2027-01-01.
+pricing:
+  currency: USD
+  models:
+    gemini-4-argon:         {input: 2, cache_read: 0.1, output: 10}
+    gemini-3.8-flash:       {input: 0.75, cache_read: 0.075, output: 3.75}
+    gemini-3.6-flash:       {input: 0.75, cache_read: 0.075, output: 3.75}
+    gemini-3.5-flash-lite:  {input: 0.3, cache_read: 0.03, output: 2.5}
+    gemini-3.1-pro-preview: {input: 2, cache_read: 0.2, output: 12}
+    gemini-3.1-flash-lite:  {input: 0.25, cache_read: 0.025, output: 1.5}
+    gemini-3-flash-preview: {input: 0.5, cache_read: 0.05, output: 3}
+    gemini-2.5-pro:         {input: 1.25, cache_read: 0.125, output: 10}
+    gemini-2.5-flash:       {input: 0.3, cache_read: 0.03, output: 2.5}
+    gemini-2.5-flash-lite:  {input: 0.1, cache_read: 0.01, output: 0.4}

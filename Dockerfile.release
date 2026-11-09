@@ -1,0 +1,8 @@
+# Used by goreleaser: the binary is already built.
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY plugrelay /usr/local/bin/plugrelay
+VOLUME /data
+ENV PLUGRELAY_DATA_DIR=/data
+EXPOSE 8787
+ENTRYPOINT ["plugrelay"]
+CMD ["serve", "--config", "/data/relay.yaml"]

@@ -1,0 +1,31 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://github.com/huggingface/text-embeddings-inference/blob/main/docs/openapi.json
+#     (v1.9.4: POST /rerank {query, texts} -> [{index, score}], POST /v1/embeddings)
+#   https://github.com/huggingface/text-embeddings-inference/blob/main/README.md
+#     (--api-key: requests carry it as a Bearer token; default port 80 in the image)
+# One server runs one model; the model name is not sent on /rerank.
+id: tei
+kind: provider
+name: Hugging Face Text Embeddings Inference
+name_zh: "Hugging Face 向量推理（TEI）"
+category: self_hosted
+homepage: https://huggingface.co/docs/text-embeddings-inference
+interpreter: openai-compatible
+variables:
+  base_url:
+    default: http://localhost:8080
+    description: Server root URL, without /v1.
+    description_zh: "服务的根地址，不带 /v1。"
+# Servers started without --api-key take no key; an empty credential secret
+# sends no Authorization header.
+auth:
+  key_optional: true
+  header: Authorization
+  scheme: Bearer
+endpoints:
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: "{base_url}/v1"
+  - id: rerank
+    protocol: tei-rerank
+    base_url: "{base_url}"

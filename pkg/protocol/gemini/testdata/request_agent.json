@@ -1,0 +1,44 @@
+{
+  "contents": [
+    {"role": "user", "parts": [{"text": "List the files in src and summarise main.go"}]},
+    {"role": "model", "parts": [
+      {"text": "I should list the directory first.", "thought": true},
+      {"functionCall": {"name": "list_directory", "args": {"path": "src"}}, "thoughtSignature": "CiQBVKhc7mVhc2lnbmF0dXJlLW9uZQ=="},
+      {"functionCall": {"name": "read_file", "args": {"path": "src/main.go"}}}
+    ]},
+    {"role": "user", "parts": [
+      {"functionResponse": {"name": "list_directory", "response": {"output": "main.go\nutil.go"}}},
+      {"functionResponse": {"name": "read_file", "response": {"output": "package main"}}}
+    ]},
+    {"role": "model", "parts": [
+      {"text": "src has two files; main.go declares package main.", "thoughtSignature": "CiQBVKhc7mVhc2lnbmF0dXJlLXR3bw=="},
+      {"text": "", "thoughtSignature": "CiQBVKhc7nN0YW5kYWxvbmU="}
+    ]},
+    {"role": "user", "parts": [
+      {"text": "Now look at this screenshot."},
+      {"inlineData": {"mimeType": "image/png", "data": "iVBORw0KGgo="}},
+      {"fileData": {"mimeType": "application/pdf", "fileUri": "https://example.com/spec.pdf"}}
+    ]}
+  ],
+  "systemInstruction": {"parts": [{"text": "You are a coding agent."}, {"text": "Be concise."}]},
+  "tools": [
+    {"functionDeclarations": [
+      {"name": "list_directory", "description": "List a directory", "parametersJsonSchema": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}},
+      {"name": "read_file", "description": "Read a file", "parameters": {"type": "OBJECT", "properties": {"path": {"type": "STRING"}}}}
+    ]},
+    {"googleSearch": {}},
+    {"urlContext": {}}
+  ],
+  "toolConfig": {"functionCallingConfig": {"mode": "AUTO"}},
+  "generationConfig": {
+    "temperature": 0.7,
+    "topP": 0.95,
+    "topK": 40,
+    "maxOutputTokens": 8192,
+    "stopSequences": ["END"],
+    "responseMimeType": "text/plain",
+    "thinkingConfig": {"thinkingBudget": 8192, "includeThoughts": true}
+  },
+  "safetySettings": [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"}],
+  "cachedContent": "cachedContents/abc123"
+}

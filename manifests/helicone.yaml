@@ -1,0 +1,44 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.helicone.ai/gateway/overview.md
+#   https://docs.helicone.ai/ai-gateway.openapi.json
+#   https://docs.helicone.ai/gateway/concepts/error-handling.md
+#   https://docs.helicone.ai/gateway/concepts/reasoning.md
+#   https://docs.helicone.ai/gateway/concepts/prompt-caching.md
+# The gateway serves chat, responses and the model list only; Claude is
+# reached through chat completions.
+id: helicone
+kind: provider
+name: Helicone AI Gateway
+name_zh: "Helicone AI 网关"
+category: gateway
+homepage: https://docs.helicone.ai/gateway/overview
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+endpoints:
+  # Reasoning arrives as `reasoning` with signed reasoning_details; left
+  # off.
+  - id: chat
+    protocol: openai-chat
+    base_url: https://ai-gateway.helicone.ai/v1
+    capabilities:
+      freeform_tools: false
+      reasoning: false
+  - id: responses
+    protocol: openai-responses
+    base_url: https://ai-gateway.helicone.ai/v1
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+errors:
+  # Out of credits shares 429 with rate limits.
+  - when: {status: 429, message_contains: "Insufficient credits"}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+models:
+  list: /models

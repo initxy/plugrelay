@@ -1,0 +1,41 @@
+# Checked 2026-11 against the vendor's official SDKs (docs.together.ai
+# refuses automated reads):
+#   https://github.com/togethercomputer/together-py/blob/main/api.md
+#   https://github.com/togethercomputer/together-py/blob/main/src/together/types/chat/completion_create_params.py
+#   https://github.com/togethercomputer/together-py/tree/main/src/together/types
+#   https://raw.githubusercontent.com/togethercomputer/together-python/main/src/together/types/rerank.py
+#   https://raw.githubusercontent.com/togethercomputer/together-python/main/src/together/resources/rerank.py
+id: together
+kind: provider
+name: Together AI
+category: inference
+homepage: https://docs.together.ai
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: none
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    capabilities:
+      freeform_tools: false
+    base_url: https://api.together.ai/v1
+  - id: completions
+    protocol: openai-completions
+    base_url: https://api.together.ai/v1
+  # /images/generations is left out: its parameters (width, height, steps,
+  # response_format "base64") are not OpenAI's.
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: https://api.together.ai/v1
+  - id: audio
+    protocol: openai-audio
+    base_url: https://api.together.ai/v1
+  # POST /v1/rerank; also takes rank_fields for object documents.
+  - protocol: rerank
+    base_url: https://api.together.ai/v1
+models:
+  list: /models

@@ -1,0 +1,45 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://docs.jan.ai/desktop/api-server
+#   https://github.com/janhq/jan/blob/main/src-tauri/src/core/server/proxy.rs
+# Desktop app; start the local API server in its settings.
+id: jan
+kind: provider
+name: Jan
+category: self_hosted
+homepage: https://docs.jan.ai
+interpreter: openai-compatible
+variables:
+  server_url:
+    default: http://localhost:1337
+    description: Root URL of the server, without its /v1 prefix.
+    description_zh: "服务的根地址，不带 /v1。"
+# The API key set in the app is checked as Authorization: Bearer or
+# X-Api-Key; an empty credential secret sends no Authorization header.
+auth:
+  key_optional: true
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: "{server_url}/v1"
+    capabilities:
+      freeform_tools: false
+  - id: completions
+    protocol: openai-completions
+    base_url: "{server_url}/v1"
+  - protocol: anthropic
+    base_url: "{server_url}"
+    interpreter: anthropic-compatible
+    capabilities:
+      cache: implicit
+      cache_1h: false
+      server_tools: []
+      deferred_tools: false
+  - id: embeddings
+    protocol: openai-embeddings
+    base_url: "{server_url}/v1"
+models:
+  list: /models

@@ -1,0 +1,41 @@
+# Checked 2026-11 against the vendor's docs:
+#   https://console.upstage.ai/docs/capabilities/generate/chat
+#   https://console.upstage.ai/docs/resources/error-codes
+id: upstage
+kind: provider
+name: Upstage (Solar)
+name_zh: "Upstage（Solar）"
+category: vendor
+homepage: https://console.upstage.ai/docs
+interpreter: openai-compatible
+auth:
+  header: Authorization
+  scheme: Bearer
+capabilities:
+  cache: implicit
+  max_tokens_field: max_tokens
+endpoints:
+  - id: chat
+    protocol: openai-chat
+    base_url: https://api.upstage.ai/v1
+    capabilities:
+      freeform_tools: false
+  # Only some Solar models serve Responses; previous_response_id and
+  # conversation are rejected.
+  - id: responses
+    protocol: openai-responses
+    base_url: https://api.upstage.ai/v1
+    capabilities:
+      freeform_tools: false
+      server_tools: []
+      deferred_tools: false
+      server_state: false
+      compaction: false
+errors:
+  # Subscription quota arrives as 403, which would otherwise quarantine the key.
+  - when: {code: studio_subscription_quota_exceeded}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: usage_limit_exceeded}
+    verdict: {cause: quota, credential: cool_until_reset, retry: next, signal: quota_exhausted}
+  - when: {code: data_residency_region_mismatch}
+    verdict: {cause: request, signal: permission}

@@ -1,0 +1,1 @@
+{"model":"jina-reranker-v2-base-multilingual","results":[{"document":{"text":"Paris is the capital of France.","id":"doc-7"},"index":1,"relevance_score":0.9},{"document":{"text":"France borders Spain."},"index":2,"relevance_score":0.4}],"usage":{"prompt_tokens":0,"total_tokens":0}}
